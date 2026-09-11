@@ -705,3 +705,45 @@ dialog .close {
     transition: none !important;
   }
 }
+
+.search-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--muted, #73796d);
+  flex-wrap: wrap;
+}
+.search-options select {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid #d8ddcf;
+  border-radius: 8px;
+  padding: 8px 12px;
+  max-width: 100%;
+}
+#description-form label {
+  display: block;
+  font-weight: 600;
+  margin: 16px 0 8px;
+}
+#description-form textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid #d8ddcf;
+  border-radius: 8px;
+  padding: 12px;
+  font: inherit;
+  color: inherit;
+  background: #fff;
+}
+.photo-tags {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

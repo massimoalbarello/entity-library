@@ -8,10 +8,11 @@ import {
   ownerRegistrationStatus,
 } from "./owner-registration.ts";
 import schema from "./schema.sql" with { type: "text" };
-import { assets, coreAsset } from "./assets.gen.ts";
+import { assets, coreAsset, captionAsset } from "./assets.gen.ts";
 import { installArtifact, fileDigest } from "./models/artifacts.ts";
 import { loadTextEncoder } from "./models/encoder.ts";
 import manifest from "./models/manifest.json";
+import captionManifest from "./models/caption-manifest.json";
 process.umask(0o077);
 const data = resolve(
   process.env.NIBRUN_DATA_DIR || process.env.DATA_DIR || "./data",
@@ -60,7 +61,10 @@ let booting = false,
 const modelState = {
   phase: "preparing",
   downloaded: 0,
-  total: manifest.artifacts.reduce((n, a) => n + a.bytes, 0),
+  total: [...manifest.artifacts, ...captionManifest.artifacts].reduce(
+    (n, a) => n + a.bytes,
+    0,
+  ),
   error: "",
 };
 const coreToken = randomBytes(32).toString("hex");
@@ -84,6 +88,13 @@ async function boot() {
       });
       completed += artifact.bytes;
     }
+    const captionDirectory = join(data, "models", captionManifest.id);
+    for (const artifact of captionManifest.artifacts) {
+      await installArtifact(captionDirectory, artifact, (bytes) => {
+        modelState.downloaded = completed + bytes;
+      });
+      completed += artifact.bytes;
+    }
     modelState.phase = "loading";
     textEncoder = await loadTextEncoder(modelDirectory);
     const runtime = join(data, "runtime");
@@ -103,12 +114,30 @@ async function boot() {
       await rename(`${corePath}.tmp`, corePath);
     }
     await chmod(corePath, 0o700);
+    const captionBytes = await Bun.file(captionAsset).bytes();
+    const captionHash = new Bun.CryptoHasher("sha256")
+      .update(captionBytes)
+      .digest("hex");
+    const captionPath = join(runtime, `caption-${captionHash.slice(0, 16)}`);
+    if (
+      !(await Bun.file(captionPath).exists()) ||
+      (await fileDigest(captionPath)) !== captionHash
+    ) {
+      await writeFile(`${captionPath}.tmp`, captionBytes, { mode: 0o700 });
+      await rename(`${captionPath}.tmp`, captionPath);
+    }
+    await chmod(captionPath, 0o700);
     core = Bun.spawn([corePath], {
+      detached: true,
       env: {
         ...process.env,
         NIBRUN_DATA_DIR: data,
         ENTITY_CORE_PORT: String(corePort),
         ENTITY_CORE_TOKEN: coreToken,
+        CAPTION_BINARY: captionPath,
+        CAPTION_MODEL: join(captionDirectory, "model.gguf"),
+        CAPTION_PROJECTOR: join(captionDirectory, "mmproj.gguf"),
+        CAPTION_MODEL_ID: captionManifest.id,
         MODEL_FILE: join(modelDirectory, "model.gguf"),
         LABELS_FILE: join(runtime, "labels.json"),
       },
@@ -224,7 +253,12 @@ async function handle(request: Request) {
       return fetch(`${coreOrigin}/api/search`, {
         method: "POST",
         headers: { ...coreHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({ tokens, space: manifest.space }),
+        body: JSON.stringify({
+          tokens,
+          space: manifest.space,
+          query: url.searchParams.get("q") || "",
+          mode: url.searchParams.get("mode") || "scene",
+        }),
         signal: request.signal,
       });
     } catch (e) {
@@ -270,7 +304,13 @@ for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.on(signal, () => {
     stopping = true;
     server.stop(true);
-    core?.kill();
+    if (core) {
+      try {
+        process.kill(-core.pid, "SIGTERM");
+      } catch {
+        core.kill();
+      }
+    }
     database.close();
     process.exit(0);
   });

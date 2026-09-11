@@ -1,0 +1,21 @@
+{
+  "id": "smolvlm-500m-q4km-scene-v1",
+  "runtime": "llama.cpp",
+  "runtimeRevision": "8172e6577ac2b35de1ec1e5d1c0aaad6c4a2129f",
+  "source": "https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/tree/72e986006ef53e37cdd3f6d4241c90b0f01df376",
+  "license": "Apache-2.0",
+  "artifacts": [
+    {
+      "name": "model.gguf",
+      "bytes": 303251712,
+      "sha256": "0036ee911a27da7d039e084f2d2c32b9976c81d9dde8945811ed589a3099bca8",
+      "url": "https://github.com/massimoalbarello/entity-library/releases/download/scene-model-v1/smolvlm-500m-q4_k_m.gguf"
+    },
+    {
+      "name": "mmproj.gguf",
+      "bytes": 108783360,
+      "sha256": "d1eb8b6b23979205fdf63703ed10f788131a3f812c7b1f72e0119d5d81295150",
+      "url": "https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/72e986006ef53e37cdd3f6d4241c90b0f01df376/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf"
+    }
+  ]
+}

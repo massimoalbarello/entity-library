@@ -32,7 +32,7 @@ jobs:
         env:
           CORE_BINARY: build/core-release/entity-core
       - run: bun run check
-      - run: bun test
+      - run: bun run test
       - name: Install camera test dependency
         run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
       - run: bun run test:linux
@@ -40,7 +40,7 @@ jobs:
         run: |
           mkdir release
           cp apps/backend/dist/entity-library LICENSE THIRD-PARTY.md release/
-          tar -czf release/third-party-notices.tar.gz vendor/*LICENSE* vendor/AUTH-LICENSES vendor/OPENCV-THIRD-PARTY vendor/clip.cpp/LICENSE vendor/clip.cpp/ggml/LICENSE
+          tar -czf release/third-party-notices.tar.gz vendor/*LICENSE* vendor/AUTH-LICENSES vendor/OPENCV-THIRD-PARTY vendor/clip.cpp/LICENSE vendor/clip.cpp/ggml/LICENSE vendor/llama-NOTICE.txt
           cd release
           sha256sum entity-library > SHA256SUMS
       - uses: actions/upload-artifact@v7

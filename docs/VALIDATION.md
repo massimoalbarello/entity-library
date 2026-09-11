@@ -86,3 +86,36 @@ banana-montage result, positive cat retrieval (0.2860), original preservation, c
 16-megapixel PNG handling, restart, deletion and passkey reauthentication. Peak cgroup
 memory was 453.6 MiB under the same 1 GiB limit. Type checking and all six backend tests
 also passed. The updated binary checksum is recorded in [deployment details](DEPLOYMENT.md).
+
+## SmolVLM scene-caption trial — 11 September 2026
+
+The integrated app uses SmolVLM-500M-Instruct Q4_K_M plus its Q8_0 projector, one 512-pixel
+view per caption, and the retained CLIP model. Models run sequentially: the CLIP context and
+scratch storage are released before the caption subprocess starts. Captions use separate
+SQLite FTS5 fields for the main scene and owner-supplied depicted content.
+
+- Linux x86_64 standalone app: **92.9 MiB**. Verified/cached model package: approximately **481 MiB**.
+- Complete disposable browser workload: **953.6 MiB peak** (`memory.peak` = 999,890,944 bytes)
+  under **1 CPU / 1 GiB**, with swap disabled. Docker Desktop on Apple Silicon emulates Linux
+  x86_64 here; this is a cgroup measurement of the full app, not a native Nibrun latency benchmark.
+  No OOM events were observed. The CI test also asserts zero OOM kills.
+- The exact COCO128 phone photo generated: “A laptop with a phone on top of it, plugged into a
+  power outlet.” It matched `phone` and did not match `person` in default scene search. This is
+  one regression case, not proof that depicted content is always handled correctly.
+- Real cat caption inference and BM25 passed. Manual scene edits, separate screen-content
+  retrieval, ordinary-person exclusion, and desktop/mobile layouts passed.
+- Browsing and scene search remained responsive while the caption subprocess ran.
+- Camera capture, protected originals, 16-megapixel PNG decode, UTF-8 filenames, invalid-image
+  handling, deletion, passkey sign-out/sign-in and restart persistence passed.
+- Native migration/FTS tests and all six Bun backend tests passed; TypeScript checking passed.
+  A real inference regression also verified stable image vectors across four CLIP unload/reload
+  cycles, with unrelated solid-color image inference between repeated encodings.
+
+That lifecycle regression exposed an uninitialized vision accumulator and global scratch
+storage in the older vendored CLIP runtime. The local fixes initialize the accumulator and
+bind scratch storage to the model context. They preserve the intended embedding contract;
+existing originals and valid CLIP vectors are retained.
+
+Captions remain approximate. The host run invented an extra red phone/brand detail for the
+same picture. The first version therefore exposes an editable caption and does not claim
+reliable automatic physical-versus-depicted entity extraction. See `SCENE-DESCRIPTIONS.md`.

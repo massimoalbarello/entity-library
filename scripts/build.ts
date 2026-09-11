@@ -1,5 +1,6 @@
 import { cp, mkdir, readdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { buildCaption } from "./build-caption.ts";
 const root = resolve(import.meta.dir, "..");
 async function run(cmd: string[]) {
   const p = Bun.spawn(cmd, { cwd: root, stdout: "inherit", stderr: "inherit" });
@@ -36,6 +37,12 @@ if (!process.env.CORE_BINARY) {
 }
 if (!(await Bun.file(core).exists()))
   throw Error(`Missing native engine: ${core}`);
+const caption = resolve(
+  process.env.CAPTION_BINARY ||
+    (host ? await buildCaption() : join(build, "llama-mtmd-cli")),
+);
+if (!(await Bun.file(caption).exists()))
+  throw Error(`Missing caption runtime: ${caption}`);
 const frontend = join(root, "apps/frontend/dist");
 await mkdir(frontend, { recursive: true });
 await cp(join(root, "apps/frontend/public"), frontend, { recursive: true });
@@ -70,11 +77,14 @@ const imports = files.map(
 imports.push(
   `import embeddedCore from ${JSON.stringify(core)} with { type: 'file' };`,
 );
+imports.push(
+  `import embeddedCaption from ${JSON.stringify(caption)} with { type: 'file' };`,
+);
 await writeFile(
   join(root, "apps/backend/src/assets.gen.ts"),
   "// @ts-nocheck -- generated assets\n" +
     imports.join("\n") +
-    "\nexport const coreAsset = embeddedCore;\nexport const assets = new Map<string,string>([" +
+    "\nexport const coreAsset = embeddedCore;\nexport const captionAsset = embeddedCaption;\nexport const assets = new Map<string,string>([" +
     files.map((name, i) => `[${JSON.stringify("/" + name)},a${i}]`).join(",") +
     "]);\n",
 );

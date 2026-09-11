@@ -25,6 +25,7 @@ let signedIn = false,
   modelReady = false,
   photos = [],
   query = "",
+  searchMode = "scene",
   timer,
   searchAbort,
   generation = 0,
@@ -115,7 +116,7 @@ function showPhotos() {
   $(".nav-item.active")?.classList.remove("active");
   $("#nav-photos").classList.add("active");
   $("#main").innerHTML =
-    `<header class="page-head"><div><div class="eyebrow">Your collection</div><h1>All photos</h1><p class="sub">Remember the thing. Find the photo.</p></div><div class="actions"><button id="camera" class="camera-button" aria-label="Take a photo">${icon("camera")}<span>Camera</span></button><button id="add" class="primary">${icon("plus")}Add photos</button><input type="file" id="files" accept="image/jpeg,image/png" multiple hidden></div></header><div id="model-notice" role="status"></div><form class="search" role="search">${icon("search")}<input id="query" aria-label="Search photos" placeholder="Try “banana”, “a red car”, or “a sunny beach”…" maxlength="240" value="${esc(query)}"><button type="button" class="quiet clear" id="clear" aria-label="Clear search">×</button><button type="submit" class="primary">Search</button></form><div class="examples">Try a search <button class="chip" data-query="banana">banana</button><button class="chip" data-query="cat">cat</button><button class="chip" data-query="coffee cup">coffee cup</button><button class="chip" data-query="beach">beach</button></div><div class="results-head"><span id="results-title">All photos</span><span id="results-count"></span></div><div id="grid" class="grid"></div><div id="empty"></div><button id="more" class="load-more" hidden>Load more</button>`;
+    `<header class="page-head"><div><div class="eyebrow">Your collection</div><h1>All photos</h1><p class="sub">Remember the thing. Find the photo.</p></div><div class="actions"><button id="camera" class="camera-button" aria-label="Take a photo">${icon("camera")}<span>Camera</span></button><button id="add" class="primary">${icon("plus")}Add photos</button><input type="file" id="files" accept="image/jpeg,image/png" multiple hidden></div></header><div id="model-notice" role="status"></div><form class="search" role="search">${icon("search")}<input id="query" aria-label="Search photos" placeholder="Try “banana”, “a red car”, or “a sunny beach”…" maxlength="240" value="${esc(query)}"><button type="button" class="quiet clear" id="clear" aria-label="Clear search">×</button><button type="submit" class="primary">Search</button></form><div class="search-options"><label for="search-mode">Search in</label><select id="search-mode"><option value="scene">Scene descriptions</option><option value="depicted">Scenes + screen / picture content</option><option value="visual">Visual similarity</option></select></div><div class="examples">Try a search <button class="chip" data-query="banana">banana</button><button class="chip" data-query="cat">cat</button><button class="chip" data-query="coffee cup">coffee cup</button><button class="chip" data-query="beach">beach</button></div><div class="results-head"><span id="results-title">All photos</span><span id="results-count"></span></div><div id="grid" class="grid"></div><div id="empty"></div><button id="more" class="load-more" hidden>Load more</button>`;
   $("#add").onclick = () => $("#files").click();
   $("#files").onchange = (e) => {
     upload([...e.target.files]);
@@ -125,6 +126,11 @@ function showPhotos() {
     EntityCamera.open({ onPhoto: (file) => upload([file]), onError: toast });
   $("form.search").onsubmit = (e) => {
     e.preventDefault();
+    runSearch($("#query").value);
+  };
+  $("#search-mode").value = searchMode;
+  $("#search-mode").onchange = () => {
+    searchMode = $("#search-mode").value;
     runSearch($("#query").value);
   };
   $("#clear").onclick = () => runSearch("");
@@ -156,7 +162,7 @@ function renderPhotos() {
   $("#grid").innerHTML = photos
     .map(
       (p) =>
-        `<button class="photo-card" data-id="${p.id}"><div class="picture">${p.status === "ready" ? `<img src="/assets/photos/${p.id}" loading="lazy" alt="${esc(p.filename)}">` : `<div class="photo-state ${p.status === "error" ? "error" : ""}">${p.status === "error" ? "Could not read photo" : "Preparing photo…"}</div>`}</div><div class="caption"><div class="filename">${esc(p.filename)}</div><div class="photo-tags">${esc(p.tags.join(" · ") || (p.status === "ready" ? "Ready to find" : p.status))}</div></div></button>`,
+        `<button class="photo-card" data-id="${p.id}"><div class="picture">${p.status === "ready" ? `<img src="/assets/photos/${p.id}" loading="lazy" alt="${esc(p.filename)}">` : `<div class="photo-state ${p.status === "error" ? "error" : ""}">${p.status === "error" ? "Could not read photo" : "Preparing photo…"}</div>`}</div><div class="caption"><div class="filename">${esc(p.filename)}</div><div class="photo-tags">${esc(p.description?.caption || (p.description?.status === "error" ? "Description needs attention" : p.status === "ready" ? "Writing a description…" : p.status))}</div></div></button>`,
     )
     .join("");
   $("#grid")
@@ -164,7 +170,7 @@ function renderPhotos() {
     .forEach((b) => (b.onclick = () => detail(b.dataset.id)));
   $("#empty").innerHTML = photos.length
     ? ""
-    : `<div class="empty"><div class="empty-icon">${icon(query ? "search" : "photo")}</div><h2>${query ? "Nothing here just yet." : "Start with a photo."}</h2><p class="sub">${query ? "Try a broader description, or add more photos to your collection." : "Upload a few photos or take one with your camera. Then find the things inside with a simple search."}</p>${query ? "" : '<button class="primary" id="empty-add">Add your first photos</button>'}</div>`;
+    : `<div class="empty"><div class="empty-icon">${icon(query ? "search" : "photo")}</div><h2>${query ? "Nothing here just yet." : "Start with a photo."}</h2><p class="sub">${query ? "Try fewer words, check the photo descriptions, or choose Visual similarity." : "Upload a few photos or take one with your camera. Then find the things inside with a simple search."}</p>${query ? "" : '<button class="primary" id="empty-add">Add your first photos</button>'}</div>`;
   $("#empty-add")?.addEventListener("click", () => $("#files").click());
   $("#more").hidden = Boolean(query) || allLoaded || photos.length === 0;
 }
@@ -181,7 +187,9 @@ async function runSearch(value) {
   try {
     $("#results-title").textContent = "Searching…";
     const data = await api(
-      query ? `/api/search?q=${encodeURIComponent(query)}` : "/api/photos",
+      query
+        ? `/api/search?q=${encodeURIComponent(query)}&mode=${searchMode}`
+        : "/api/photos",
       { signal: searchAbort.signal },
     );
     if (version !== generation || !signedIn) return;
@@ -270,7 +278,11 @@ async function poll() {
       } else
         notice.innerHTML = status.queued
           ? `<div class="notice">Preparing ${status.queued} ${status.queued === 1 ? "photo" : "photos"} for search…</div>`
-          : "";
+          : status.descriptions?.queued
+            ? `<div class="notice">Writing descriptions for ${status.descriptions.queued} photos. Existing descriptions are searchable now.</div>`
+            : status.descriptions?.failed
+              ? `<div class="notice">${status.descriptions.failed} descriptions need attention. Open a photo to retry or write one.</div>`
+              : "";
     }
     if (
       modelReady &&
@@ -304,8 +316,35 @@ async function detail(id) {
   try {
     const p = await api(`/api/photos/${id}`);
     const d = modal(
-      `<h2>${esc(p.filename)}</h2>${p.status === "ready" ? `<div class="photo-view"><img src="/assets/photos/${p.id}" alt="${esc(p.filename)}"></div><div class="detail-tags"><p class="sub">Suggested labels · these can be approximate</p>${p.tags.map((t) => `<button class="chip" data-tag="${esc(t)}">${esc(t)}</button>`).join("")}</div>` : `<p class="notice ${p.status === "error" ? "error" : ""}">${esc(p.error || "This photo is being prepared for search.")}</p>`}<div class="dialog-footer"><button class="danger" id="delete-photo">Delete photo</button><div class="actions">${p.status === "error" ? '<button id="retry-photo">Try again</button>' : ""}<a class="button" download="${esc(p.filename)}" href="/assets/originals/${p.id}">Download original</a></div></div>`,
+      `<h2>${esc(p.filename)}</h2>${p.status === "ready" ? `<div class="photo-view"><img src="/assets/photos/${p.id}" alt="${esc(p.filename)}"></div><div class="detail-tags"><p class="sub">${p.description?.manual ? "Your description" : "Automatic description · review and correct if needed"}</p><form id="description-form"><label for="scene-caption">Main scene</label><textarea id="scene-caption" rows="3" maxlength="1200" required placeholder="Describe the main objects and what they are doing.">${esc(p.description?.caption || "")}</textarea><label for="depicted-caption">Shown on a screen or in a picture (optional)</label><textarea id="depicted-caption" rows="2" maxlength="1200" placeholder="For example: a person shown on the phone screen.">${esc(p.description?.depicted || "")}</textarea><p class="sub">Scene searches use the main description. Keep depicted people and objects in the separate field.</p><div class="actions"><button class="primary" type="submit">Save description</button>${p.description?.status === "error" && !p.description?.manual ? '<button type="button" id="retry-description">Retry automatic description</button>' : ""}</div><p class="sub" role="status">${esc(p.description?.error || (!p.description?.caption ? "An automatic description is being prepared. You can write one now." : ""))}</p></form></div>` : `<p class="notice ${p.status === "error" ? "error" : ""}">${esc(p.error || "This photo is being prepared for search.")}</p>`}<div class="dialog-footer"><button class="danger" id="delete-photo">Delete photo</button><div class="actions">${p.status === "error" ? '<button id="retry-photo">Try again</button>' : ""}<a class="button" download="${esc(p.filename)}" href="/assets/originals/${p.id}">Download original</a></div></div>`,
     );
+    $("#description-form", d)?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await api(`/api/photos/${id}/description`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            caption: $("#scene-caption", d).value.trim(),
+            depicted: $("#depicted-caption", d).value.trim(),
+          }),
+        });
+        d.close();
+        await runSearch(query);
+        toast("Description saved.");
+      } catch (e) {
+        toast(e.message);
+      }
+    });
+    $("#retry-description", d)?.addEventListener("click", async () => {
+      try {
+        await api(`/api/photos/${id}/description/retry`, { method: "POST" });
+        d.close();
+        toast("Description queued.");
+      } catch (e) {
+        toast(e.message);
+      }
+    });
     d.querySelectorAll("[data-tag]").forEach(
       (b) =>
         (b.onclick = () => {

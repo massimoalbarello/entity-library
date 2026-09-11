@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright-core";
+import captionManifest from "../apps/backend/src/models/caption-manifest.json";
 import manifest from "../apps/backend/src/models/manifest.json";
 import { installArtifact } from "../apps/backend/src/models/artifacts.ts";
 const root = resolve(import.meta.dir, "..");
@@ -16,7 +17,15 @@ const cache = resolve(
 );
 for (const artifact of manifest.artifacts)
   await installArtifact(cache, artifact);
+const captionCache = resolve(
+  process.env.CAPTION_CACHE || join(root, "build/caption-cache"),
+);
+for (const artifact of captionManifest.artifacts)
+  await installArtifact(captionCache, artifact);
 await mkdir(join(data, "models"), { recursive: true });
+await cp(captionCache, join(data, "models", captionManifest.id), {
+  recursive: true,
+});
 if (process.env.TEST_COLD !== "1")
   await cp(cache, join(data, "models", manifest.id), { recursive: true });
 for (const [name, url] of [
@@ -29,10 +38,39 @@ for (const [name, url] of [
     "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/coco_sample.png",
   ],
 ]) {
-  const r = await fetch(url!, { signal: AbortSignal.timeout(30_000) });
-  if (!r.ok) throw Error("Could not download public test fixture");
-  await Bun.write(join(fixtures, name!), r);
+  const download = Bun.spawn(
+    [
+      "curl",
+      "-fsSL",
+      "--max-time",
+      "60",
+      "--retry",
+      "2",
+      url!,
+      "-o",
+      join(fixtures, name!),
+    ],
+    { stdout: "ignore", stderr: "inherit" },
+  );
+  assert.equal(
+    await download.exited,
+    0,
+    "Could not download public test fixture",
+  );
 }
+// Reproduce the screen-person regression with the public COCO128 source photo.
+const fixtureCache = join(root, "build/fixture-cache");
+const cocoZip = await installArtifact(fixtureCache, {
+  name: "coco128.zip",
+  url: "https://github.com/ultralytics/assets/releases/download/v0.0.0/coco128.zip",
+  bytes: 6983030,
+  sha256: "61e5e3028863d8ffc3b81d6a514603954889f0edd5e4b44c4ce60b2da99aeb8e",
+});
+const extract = Bun.spawn(
+  ["unzip", "-p", cocoZip, "coco128/images/train2017/000000000387.jpg"],
+  { stdout: Bun.file(join(fixtures, "phone.jpg")), stderr: "inherit" },
+);
+assert.equal(await extract.exited, 0);
 const video = join(out, "camera.y4m");
 const ffmpeg = Bun.spawn(
   [
@@ -79,6 +117,7 @@ const linux = process.env.TEST_LINUX === "1";
 const container = `entity-test-${Date.now()}`;
 let server: ReturnType<typeof Bun.spawn>;
 const memoryPeaks: number[] = [];
+const oomKills: number[] = [];
 async function start() {
   const binary = resolve(
     process.env.APP_BINARY || join(root, "apps/backend/dist/entity-library"),
@@ -144,6 +183,13 @@ async function stop() {
     );
     const bytes = Number(await new Response(read.stdout).text());
     if ((await read.exited) === 0 && bytes) memoryPeaks.push(bytes);
+    const events = Bun.spawn(
+      ["docker", "exec", container, "cat", "/sys/fs/cgroup/memory.events"],
+      { stdout: "pipe", stderr: "ignore" },
+    );
+    const eventText = await new Response(events.stdout).text();
+    if ((await events.exited) === 0)
+      oomKills.push(Number(eventText.match(/^oom_kill (\d+)/m)?.[1] || 0));
     const p = Bun.spawn(["docker", "stop", "-t", "5", container], {
       stdout: "ignore",
       stderr: "inherit",
@@ -204,11 +250,23 @@ async function api(path: string, method = "GET", body?: unknown) {
     { path, method, body },
   );
 }
+let sawCaptioning = false;
 async function ready() {
   for (let i = 0; i < 1800; i++) {
     const s = await api("/api/status");
+    if (s.body.captioning && !sawCaptioning) {
+      sawCaptioning = true;
+      assert.equal((await api("/api/photos")).status, 200);
+      assert.equal((await api("/api/search?q=phone")).status, 200);
+      console.log("PASS browsing and scene search during caption inference");
+    }
     if (s.body.model.phase === "failed") throw Error(s.body.model.error);
-    if (s.body.model.phase === "ready" && s.body.queued === 0) return s.body;
+    if (
+      s.body.model.phase === "ready" &&
+      s.body.queued === 0 &&
+      s.body.descriptions?.queued === 0
+    )
+      return s.body;
     await Bun.sleep(200);
   }
   throw Error("Inference did not finish");
@@ -276,6 +334,34 @@ try {
     ).status,
     403,
   );
+  await add("phone.jpg");
+  const phone = (await api("/api/photos")).body.photos.find(
+    (p: any) => p.filename === "phone.jpg",
+  );
+  assert.equal(
+    phone.description.status,
+    "ready",
+    JSON.stringify(phone.description),
+  );
+  assert.match(phone.description.caption.toLowerCase(), /phone|laptop/);
+  assert.ok(
+    !(await api("/api/search?q=person")).body.photos.some(
+      (p: any) => p.id === phone.id,
+    ),
+    JSON.stringify(phone.description),
+  );
+  assert.equal((await api("/api/search?q=phone")).body.photos[0]?.id, phone.id);
+  console.log(
+    "PASS phone-screen regression with real generated caption",
+    phone.description.caption,
+  );
+  await page.locator(`.photo-card[data-id="${phone.id}"]`).click();
+  await page.screenshot({
+    path: join(out, "phone-description.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await api(`/api/photos/${phone.id}`, "DELETE");
   await add("banana.jpg");
   await add("cats.png");
   let rows = (await api("/api/photos")).body.photos;
@@ -290,7 +376,7 @@ try {
     await readFile(join(fixtures, "banana.jpg")),
   );
   for (const [q, id] of [["cat", cats.id]]) {
-    const result = await api("/api/search?q=" + q);
+    const result = await api("/api/search?mode=visual&q=" + q);
     assert.equal(result.status, 200);
     assert.equal(
       result.body.photos[0]?.id,
@@ -307,10 +393,48 @@ try {
       })),
     );
   }
+  assert.equal(
+    cats.description.status,
+    "ready",
+    JSON.stringify(cats.description),
+  );
+  assert.match(cats.description.caption.toLowerCase(), /cat/);
+  const scenes = await api("/api/search?q=cat");
+  assert.equal(scenes.body.photos[0]?.id, cats.id);
+  await page.getByRole("button", { name: "Clear search", exact: true }).click();
+  await page.locator(`.photo-card[data-id="${banana.id}"]`).click();
+  await page
+    .locator("#scene-caption")
+    .fill("A phone rests on stacked laptops.");
+  await page
+    .locator("#depicted-caption")
+    .fill("A person appears on the phone screen.");
+  await page
+    .getByRole("button", { name: "Save description", exact: true })
+    .click();
+  await page.waitForFunction(() => !document.querySelector("dialog"));
+  assert.equal(
+    (await api("/api/search?q=phone")).body.photos[0]?.id,
+    banana.id,
+  );
+  assert.ok(
+    !(await api("/api/search?q=person")).body.photos.some(
+      (p: any) => p.id === banana.id,
+    ),
+  );
+  assert.equal(
+    (await api("/api/search?mode=depicted&q=person%20on%20a%20phone%20screen"))
+      .body.photos[0]?.id,
+    banana.id,
+  );
+  console.log(
+    "PASS real caption inference, BM25, editable scene and depicted-content separation",
+  );
   // This montage's weak banana match (~0.247) is intentionally filtered.
-  const weak = await api("/api/search?q=banana");
+  const weak = await api("/api/search?mode=visual&q=banana");
   assert.equal(weak.status, 200);
   assert.deepEqual(weak.body.photos, []);
+  await page.locator("#search-mode").selectOption("visual");
   await page.locator("#query").fill("banana");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.waitForFunction(
@@ -414,7 +538,10 @@ try {
   await start();
   await ready();
   assert.deepEqual((await api("/api/photos")).body.photos, before);
-  assert.equal((await api("/api/search?q=cat")).body.photos[0].id, cats.id);
+  assert.equal(
+    (await api("/api/search?mode=visual&q=cat")).body.photos[0].id,
+    cats.id,
+  );
   console.log(
     "PASS originals, embeddings, passkey session and retrieval survive restart",
   );
@@ -428,7 +555,7 @@ try {
     false,
   );
   assert.equal(
-    (await api("/api/search?q=cat")).body.photos.some(
+    (await api("/api/search?mode=visual&q=cat")).body.photos.some(
       (p: any) => p.id === cats.id,
     ),
     false,
@@ -445,6 +572,7 @@ try {
     .getByRole("heading", { name: "All photos", exact: true })
     .waitFor();
   assert.equal((await api("/api/photos")).body.photos.length, 2);
+  assert.ok(sawCaptioning, "real caption worker was exercised");
   assert.deepEqual(errors, []);
   console.log(
     "PASS delete, sign out, returning passkey, desktop and mobile browser checks",
@@ -462,10 +590,16 @@ try {
   await stop();
   if (memoryPeaks.length) {
     const peak = Math.max(...memoryPeaks);
+    assert.equal(
+      oomKills.reduce((a, b) => a + b, 0),
+      0,
+      "Linux workload must not invoke the OOM killer",
+    );
     await writeFile(
       join(out, "memory.json"),
       JSON.stringify(
         {
+          oomKills: oomKills.reduce((a, b) => a + b, 0),
           peakBytes: peak,
           peakMiB: peak / 1048576,
           limitMiB: 1024,

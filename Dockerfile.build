@@ -1,3 +1,16 @@
+FROM alpine:3.21 AS caption
+RUN apk add --no-cache build-base cmake linux-headers curl tar
+WORKDIR /caption
+RUN curl -fsSL https://codeload.github.com/ggml-org/llama.cpp/tar.gz/8172e6577ac2b35de1ec1e5d1c0aaad6c4a2129f -o llama.tar.gz \
+ && echo 'c5c6b91e02e6d15af2a5481c3ebadb964f6bcade95b4eec9467a511f6c43b23a  llama.tar.gz' | sha256sum -c - \
+ && tar -xzf llama.tar.gz --strip-components=1
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DBUILD_SHARED_LIBS=OFF \
+ -DGGML_NATIVE=OFF -DGGML_BLAS=OFF -DGGML_OPENMP=OFF -DLLAMA_CURL=OFF \
+ -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=OFF \
+ '-DCMAKE_EXE_LINKER_FLAGS=-static -Wl,-z,stack-size=8388608' \
+ && cmake --build build --target llama-mtmd-cli -j2 \
+ && strip build/bin/llama-mtmd-cli
+
 FROM alpine:3.21 AS build
 RUN apk add --no-cache build-base cmake linux-headers curl tar bzip2
 WORKDIR /deps
@@ -21,7 +34,9 @@ RUN cmake -S opencv-4.10.0 -B opencv-build \
 RUN cmake -S opencv-4.10.0 -B opencv-build -DBUILD_PROTOBUF=OFF -DWITH_PROTOBUF=OFF \
  && cmake --install opencv-build
 WORKDIR /src
-COPY . .
+COPY vendor ./vendor
+COPY apps/backend/engine ./apps/backend/engine
+COPY apps/backend/src/models/manifest.json ./apps/backend/src/models/manifest.json
 RUN cmake -S apps/backend/engine -B build -DCMAKE_BUILD_TYPE=MinSizeRel \
  -DOpenCV_DIR=/opt/opencv/lib/cmake/opencv4 -DCMAKE_EXE_LINKER_FLAGS=-static -DCLIP_STATIC=ON \
  && cmake --build build -j2 \
@@ -29,3 +44,5 @@ RUN cmake -S apps/backend/engine -B build -DCMAKE_BUILD_TYPE=MinSizeRel \
  && strip build/entity-core
 FROM scratch AS binary
 COPY --from=build /src/build/entity-core /entity-core
+
+COPY --from=caption /caption/build/bin/llama-mtmd-cli /llama-mtmd-cli

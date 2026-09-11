@@ -1,30 +1,33 @@
 # Entity Library
 
-A private Nibrun photo library with passkey sign-in, camera capture, suggested object labels,
-and natural-language photo search. Built from the patterns in
-[Face Library](https://github.com/massimoalbarello/face-library) and
-[PDF Signer](https://github.com/massimoalbarello/pdf-signer).
+A private Nibrun photo library with passkey sign-in, camera capture, short scene descriptions,
+and photo search. Built from the patterns in [Face Library](https://github.com/massimoalbarello/face-library)
+and [PDF Signer](https://github.com/massimoalbarello/pdf-signer).
 
-The first model is **OpenCLIP ViT-B/32 LAION2B, Q4_0**, running on the CPU through `clip.cpp`.
-The app embeds inference code and the frontend in one executable. On first startup it downloads
-about **88 MiB** of pinned weights and tokenizer files, verifies their SHA-256 checksums, and
-caches them in persistent storage. Subsequent starts reuse those files. Searches and photos
-are processed on the instance; they are not sent to a model API.
+**SmolVLM-500M-Instruct Q4_K_M** writes a short caption for each photo. Default search uses
+those captions through SQLite FTS5/BM25. **OpenCLIP ViT-B/32 LAION2B Q4_0** remains available
+in the separate Visual similarity mode.
+
+The frontend and native inference runtimes are embedded in one executable. Model files are
+downloaded once (about **481 MiB** total), checked against pinned SHA-256 hashes and cached
+in persistent storage. Photos and inference stay on the instance; no external model API is used.
 
 ## Use it
 
-Create your owner passkey, add JPEG/PNG photos or use the camera, then search for things such
-as “banana”, “cat”, or “a red car”. The app indexes the whole photo and four overlapping crops,
-so a smaller object has a better chance of being found. It also suggests up to three labels.
+Create your owner passkey and add JPEG/PNG photos or use the camera. Existing photos also get
+captions automatically. Open a photo to review or edit its description. Keep people or objects
+shown inside screens/pictures in the optional depicted-content field; ordinary scene searches
+exclude that field. Choose the combined mode to search it explicitly.
 
-Search returns only matches scoring at least 0.25, configured per model in the manifest.
-Weak matches are omitted, so searches can return no results.
+Captions describe relationships such as “a dog lying beside a bicycle,” but can still omit or
+invent details. Automatic generation does not reliably separate depicted content yet; corrections
+are preserved. Scene search requires matching words (with English stemming), so try fewer words
+or Visual similarity for broader matching. Visual results use the existing 0.25 CLIP cutoff.
 
-Labels and search results are approximate. This version recognizes visual categories and
-scenes; it does not identify a particular person's mug across photos, count objects, or produce
-accurate object boundaries. The current label vocabulary is English; search accepts free text,
-with best results expected in English. Maximums: 2,000 photos, 12 MiB per upload, 16 megapixels
-for PNGs. JPEGs are decoded at reduced resolution when large. Originals are preserved.
+The app does not produce accurate object boundaries or identify a specific person's belongings.
+Maximums: 2,000 photos, 12 MiB per upload, 16 megapixels for PNGs. Originals are preserved.
+Captioning uses a single 512-pixel view and processes one photo at a time. Browsing and scene
+search remain available; visual inference pauses while captions are generated.
 
 ## Build and run
 
@@ -54,12 +57,14 @@ Nibrun provides `NIBRUN_HTTP_PORT`, `NIBRUN_HOSTNAME`, and `NIBRUN_DATA_DIR`. Ke
 data directory across deployments and allocate **1 GB RAM** as specified for this app.
 The `/health` endpoint responds while the model is downloading; signed-in users see download
 progress and can retry a failed setup. Photo browsing and search become available once the
-native engine has loaded. The first startup needs outbound HTTPS access to Hugging Face.
+native engine has loaded. The first startup needs outbound HTTPS access to Hugging Face and GitHub release assets.
 
 ## Small reusable structure
 
 | Location | Responsibility |
 |---|---|
+| `apps/backend/src/models/caption-manifest.json` | Caption model identity, pinned artifacts and runtime revision |
+| `apps/backend/engine/src/captions.h` | Bounded caption process, derived description schema and BM25 query construction |
 | `apps/backend/src/models/manifest.json` | Exact model identity, artifact URLs, hashes, sizes, dimensions and embedding-space version |
 | `apps/backend/src/models/artifacts.ts` | Verified downloads, atomic installation and reuse of cached files |
 | `apps/backend/src/models/encoder.ts` | CLIP text tokenization and the initial label vocabulary |
@@ -69,18 +74,18 @@ native engine has loaded. The first startup needs outbound HTTPS access to Huggi
 | `apps/backend/src/server.ts` | Public HTTP, passkey authorization and model startup |
 | `apps/frontend/` | Photo browser, search and camera flow |
 
-There is one model per library in this version. Its embedding-space version is persisted with
+There is one CLIP embedding space per library. Its version is persisted with
 the library, and incompatible versions fail closed. Adding another CLIP-family model should
 reuse the artifact installer and photo/search pipeline; a new runtime only needs to implement
 the encoder contract. Replacing a model for existing photos also requires an explicit reindex
 migration. There is no hot-swap framework or destructive automatic migration.
-See [architecture](docs/ARCHITECTURE.md) for that contract and upgrade path.
+See [architecture](docs/ARCHITECTURE.md) for that contract and upgrade path, and [scene descriptions](docs/SCENE-DESCRIPTIONS.md) for the independent caption pipeline.
 
 ## Checks
 
 ```sh
 bun run check
-bun test
+bun run test
 bun run test:browser  # host executable; Chrome/Chromium and ffmpeg required
 bun run test:linux    # Linux executable in a disposable 1 CPU / 1 GiB container
 ```
@@ -92,7 +97,7 @@ See [validation](docs/VALIDATION.md) for measured results and limitations.
 
 GitHub Actions runs the Linux build and checks on pull requests and main pushes. A successful
 version-tag build packages the binary, checksum and notices as a release. The app is [deployed on Nibrun](https://entity-library-gf84pk.nibrun.app).
-See [deployment status](docs/DEPLOYMENT.md), including the outstanding RAM allocation.
+See [deployment status](docs/DEPLOYMENT.md), and validation of the 1 GB allocation.
 Source: [massimoalbarello/entity-library](https://github.com/massimoalbarello/entity-library).
 
 MIT licensed. Third-party components retain their licenses; see [notices](THIRD-PARTY.md).

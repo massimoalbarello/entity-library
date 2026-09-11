@@ -250,6 +250,8 @@ struct clip_ctx {
     struct ggml_context * ctx;
     struct gguf_context * ctx_gguf;
     struct clip_buffer buf_compute;
+    // Entity Library: release scratch storage with the model. Inference is serialized.
+    struct clip_buffer buf_scratch;
 };
 
 //
@@ -588,6 +590,7 @@ struct clip_ctx * clip_model_load(const char * fname, const int verbosity = 1) {
 
     const size_t mem_req = get_mem_req_by_size(new_clip);
     new_clip->buf_compute.resize(mem_req);
+    new_clip->buf_scratch.resize(get_scr_buf_req_by_size(new_clip));
     if (verbosity >= 1) {
         printf("\n%s: %zu MB of memory allocated\n", __func__, mem_req / 1024 / 1024);
     }
@@ -1045,8 +1048,8 @@ bool clip_text_encode(const clip_ctx * ctx, const int n_threads, const clip_toke
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
 
-    static size_t scr0_size = get_scr_buf_req_by_size((struct clip_ctx *)ctx);
-    static void * scr0 = malloc(scr0_size);
+    const size_t scr0_size = ctx->buf_scratch.size;
+    void * scr0 = ctx->buf_scratch.data;
 
     struct ggml_tensor * input_ids = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
     memcpy(input_ids->data, tokens->data, N * ggml_element_size(input_ids));
@@ -1279,8 +1282,8 @@ bool clip_image_batch_encode(const clip_ctx * ctx, const int n_threads, const cl
     struct ggml_context * ctx0 = ggml_init(params);
     struct ggml_cgraph gf = {};
 
-    static size_t scr0_size = get_scr_buf_req_by_size((struct clip_ctx *)ctx);
-    static void * scr0 = malloc(scr0_size);
+    const size_t scr0_size = ctx->buf_scratch.size;
+    void * scr0 = ctx->buf_scratch.data;
 
     struct ggml_tensor * inp_raw = ggml_new_tensor_4d(ctx0, GGML_TYPE_F32, image_size, image_size, 3, batch_size);
 
@@ -1444,6 +1447,8 @@ bool clip_image_batch_encode(const clip_ctx * ctx, const int n_threads, const cl
 
     // normalize output embeddings
     struct ggml_tensor * output = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, projection_dim, batch_size);
+    // ggml_acc adds to this tensor: reused or freshly allocated memory is not zeroed.
+    ggml_set_zero(output);
 
     for (int b = 0; b < batch_size; b++) {
         struct ggml_tensor * embedding = ggml_get_rows(ctx0, embeddings, ggml_new_i32(ctx0, b));
