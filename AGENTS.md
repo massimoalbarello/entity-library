@@ -27,3 +27,5 @@ Do not add separate description fields for screen content or invent attributes t
 
 Search always combines description BM25 and thresholded visual retrieval into one ranked list.
 Do not add a search mode selector or silently fall back to only one retrieval source.
+
+Keep the search interface minimal: no suggested-query chips or “Try a search” row.

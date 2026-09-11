@@ -115,7 +115,7 @@ function showPhotos() {
   $(".nav-item.active")?.classList.remove("active");
   $("#nav-photos").classList.add("active");
   $("#main").innerHTML =
-    `<header class="page-head"><div><div class="eyebrow">Your collection</div><h1>All photos</h1><p class="sub">Remember the thing. Find the photo.</p></div><div class="actions"><button id="camera" class="camera-button" aria-label="Take a photo">${icon("camera")}<span>Camera</span></button><button id="add" class="primary">${icon("plus")}Add photos</button><input type="file" id="files" accept="image/jpeg,image/png" multiple hidden></div></header><div id="model-notice" role="status"></div><form class="search" role="search">${icon("search")}<input id="query" aria-label="Search photos" placeholder="Try “banana”, “a red car”, or “a sunny beach”…" maxlength="240" value="${esc(query)}"><button type="button" class="quiet clear" id="clear" aria-label="Clear search">×</button><button type="submit" class="primary">Search</button></form><div class="examples">Try a search <button class="chip" data-query="banana">banana</button><button class="chip" data-query="cat">cat</button><button class="chip" data-query="coffee cup">coffee cup</button><button class="chip" data-query="beach">beach</button></div><div class="results-head"><span id="results-title">All photos</span><span id="results-count"></span></div><div id="grid" class="grid"></div><div id="empty"></div><button id="more" class="load-more" hidden>Load more</button>`;
+    `<header class="page-head"><div><div class="eyebrow">Your collection</div><h1>All photos</h1><p class="sub">Remember the thing. Find the photo.</p></div><div class="actions"><button id="camera" class="camera-button" aria-label="Take a photo">${icon("camera")}<span>Camera</span></button><button id="add" class="primary">${icon("plus")}Add photos</button><input type="file" id="files" accept="image/jpeg,image/png" multiple hidden></div></header><div id="model-notice" role="status"></div><form class="search" role="search">${icon("search")}<input id="query" aria-label="Search photos" placeholder="Try “banana”, “a red car”, or “a sunny beach”…" maxlength="240" value="${esc(query)}"><button type="button" class="quiet clear" id="clear" aria-label="Clear search">×</button><button type="submit" class="primary">Search</button></form><div class="results-head"><span id="results-title">All photos</span><span id="results-count"></span></div><div id="grid" class="grid"></div><div id="empty"></div><button id="more" class="load-more" hidden>Load more</button>`;
   $("#add").onclick = () => $("#files").click();
   $("#files").onchange = (e) => {
     upload([...e.target.files]);
@@ -128,9 +128,6 @@ function showPhotos() {
     runSearch($("#query").value);
   };
   $("#clear").onclick = () => runSearch("");
-  document
-    .querySelectorAll("[data-query]")
-    .forEach((b) => (b.onclick = () => runSearch(b.dataset.query)));
   $("#more").onclick = loadMore;
   const main = $("#main");
   main.ondragover = (e) => {
