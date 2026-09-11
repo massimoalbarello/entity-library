@@ -20,3 +20,7 @@ observable behavior and data integrity rather than duplicating implementation de
 
 Keep the interface black, white and neutral gray, matching Face Library's Minimal Neutral
 palette. Preserve the original colors of photos and camera previews.
+
+Each photo has one editable description. Generate direct scene descriptions with visible
+attributes and relationships; avoid stock introductions such as “a picture of” or “in this image”.
+Do not add separate description fields for screen content or invent attributes to fill a template.

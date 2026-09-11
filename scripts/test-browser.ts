@@ -399,16 +399,23 @@ try {
     JSON.stringify(cats.description),
   );
   assert.match(cats.description.caption.toLowerCase(), /cat/);
+  for (const p of [phone, cats]) {
+    assert.doesNotMatch(
+      p.description.caption,
+      /^(?:(?:a|the) (?:picture|photo|image) (?:of|shows)|in (?:this|the) (?:image|photo|picture))/i,
+    );
+    assert.equal("depicted" in p.description, false);
+    assert.match(p.description.model_id, /:direct-v2$/);
+  }
   const scenes = await api("/api/search?q=cat");
   assert.equal(scenes.body.photos[0]?.id, cats.id);
   await page.getByRole("button", { name: "Clear search", exact: true }).click();
   await page.locator(`.photo-card[data-id="${banana.id}"]`).click();
   await page
     .locator("#scene-caption")
-    .fill("A phone rests on stacked laptops.");
-  await page
-    .locator("#depicted-caption")
-    .fill("A person appears on the phone screen.");
+    .fill("A small black phone rests on stacked silver laptops.");
+  assert.equal(await page.locator("#description-form textarea").count(), 1);
+  assert.equal(await page.locator("#search-mode option").count(), 2);
   await page
     .getByRole("button", { name: "Save description", exact: true })
     .click();
@@ -423,12 +430,11 @@ try {
     ),
   );
   assert.equal(
-    (await api("/api/search?mode=depicted&q=person%20on%20a%20phone%20screen"))
-      .body.photos[0]?.id,
+    (await api("/api/search?q=small%20black%20phone")).body.photos[0]?.id,
     banana.id,
   );
   console.log(
-    "PASS real caption inference, BM25, editable scene and depicted-content separation",
+    "PASS real caption inference, BM25 adjective search and single description editor",
   );
   // This montage's weak banana match (~0.247) is intentionally filtered.
   const weak = await api("/api/search?mode=visual&q=banana");

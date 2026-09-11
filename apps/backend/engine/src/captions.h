@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <fcntl.h>
 #include <set>
+#include <regex>
 #include <sstream>
 #include <sys/wait.h>
 #include <thread>
@@ -17,10 +18,28 @@
 #include <malloc.h>
 #endif
 
+inline constexpr auto CAPTION_PROMPT =
+  "Describe the main visible subjects and their relationships in one concise sentence. "
+  "Include clear colors, sizes, textures, hair and clothing where visible. "
+  "Describe only what is visible; do not guess identities, brands or details. "
+  "Start directly with the subjects, without phrases like 'a picture of' or 'in this image'. "
+  "Focus on the main scene, not tiny content inside screens or pictures.";
+
 inline std::string short_caption(std::string text) {
   auto first = text.find_first_not_of(" \r\n\t");
   if (first == std::string::npos) throw std::runtime_error("No description generated");
   text.erase(0, first);
+  // Remove stock introductions only at the beginning, retaining relationships
+  // such as "a phone displaying a picture of a dog" inside the scene itself.
+  static const std::regex intro(
+    R"(^\s*(?:(?:in|within)\s+(?:(?:this|the)\s+)?(?:image|picture|photo|photograph)[,:]?\s*|(?:this|the)\s+(?:image|picture|photo|photograph)\s+(?:(?:shows|depicts|features|captures|contains)\s+|is\s+(?:of\s+)?)|(?:(?:this|it)\s+is\s+)?(?:(?:a|an)\s+)?(?:image|picture|photo|photograph)\s+of\s+|(?:we|you)\s+can\s+see\s+|there\s+(?:is|are)\s+))",
+    std::regex::icase);
+  for (int i = 0; i < 8; ++i) {
+    auto direct = std::regex_replace(text, intro, "", std::regex_constants::format_first_only);
+    if (direct == text) break;
+    text = direct;
+  }
+  if (!text.empty()) text[0] = char(std::toupper(static_cast<unsigned char>(text[0])));
   // Keep the first complete sentence; never index a truncated token stream.
   auto end = text.find_first_of(".!?\n");
   if (end == std::string::npos || end > 600)
@@ -80,15 +99,28 @@ inline std::string caption_process(const std::vector<std::string> &args) {
 }
 
 inline void migrate_captions(DB &db) {
-  db.exec("CREATE TABLE IF NOT EXISTS descriptions(photo_id INTEGER PRIMARY KEY REFERENCES photos(id) ON DELETE CASCADE, model_id TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'queued', caption TEXT NOT NULL DEFAULT '', depicted TEXT NOT NULL DEFAULT '', manual INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '');"
-    "CREATE VIRTUAL TABLE IF NOT EXISTS scene_fts USING fts5(caption,depicted,tokenize='porter unicode61');"
+  Transaction tx(db);
+  db.exec("CREATE TABLE IF NOT EXISTS descriptions(photo_id INTEGER PRIMARY KEY REFERENCES photos(id) ON DELETE CASCADE, model_id TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'queued', caption TEXT NOT NULL DEFAULT '', manual INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '');");
+  bool legacy = false;
+  for (const auto &column : db.query("PRAGMA table_info(descriptions)"))
+    if (column["name"] == "depicted") legacy = true;
+  if (legacy) {
+    db.exec("DROP TRIGGER IF EXISTS description_delete; DROP TRIGGER IF EXISTS description_update; DROP TRIGGER IF EXISTS description_insert; DROP TABLE IF EXISTS scene_fts;"
+      // Preserve everything the owner wrote before removing the second field.
+      "UPDATE descriptions SET caption=trim(caption || CASE WHEN trim(depicted)='' THEN '' ELSE ' ' || depicted END);"
+      "ALTER TABLE descriptions DROP COLUMN depicted;"
+      "UPDATE descriptions SET status='queued',error='' WHERE manual=0;");
+  }
+  db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS scene_fts USING fts5(caption,tokenize='porter unicode61');"
     "CREATE TRIGGER IF NOT EXISTS description_delete AFTER DELETE ON descriptions BEGIN DELETE FROM scene_fts WHERE rowid=old.photo_id; END;"
-    "CREATE TRIGGER IF NOT EXISTS description_update AFTER UPDATE ON descriptions BEGIN DELETE FROM scene_fts WHERE rowid=old.photo_id; INSERT INTO scene_fts(rowid,caption,depicted) SELECT new.photo_id,new.caption,new.depicted WHERE new.status='ready'; END;"
-    "CREATE TRIGGER IF NOT EXISTS description_insert AFTER INSERT ON descriptions WHEN new.status='ready' BEGIN INSERT INTO scene_fts(rowid,caption,depicted) VALUES(new.photo_id,new.caption,new.depicted); END;");
+    "CREATE TRIGGER IF NOT EXISTS description_update AFTER UPDATE ON descriptions BEGIN DELETE FROM scene_fts WHERE rowid=old.photo_id; INSERT INTO scene_fts(rowid,caption) SELECT new.photo_id,new.caption WHERE new.status='ready'; END;"
+    "CREATE TRIGGER IF NOT EXISTS description_insert AFTER INSERT ON descriptions WHEN new.status='ready' BEGIN INSERT INTO scene_fts(rowid,caption) VALUES(new.photo_id,new.caption); END;");
+  if (legacy) db.exec("INSERT INTO scene_fts(rowid,caption) SELECT photo_id,caption FROM descriptions WHERE status='ready';");
   db.exec("INSERT OR IGNORE INTO descriptions(photo_id) SELECT id FROM photos; UPDATE descriptions SET status='queued' WHERE status='processing';");
+  tx.commit();
 }
 
-inline std::string scene_query(const std::string &input, bool depicted) {
+inline std::string scene_query(const std::string &input) {
   if (input.size() > 960) throw std::runtime_error("Search is too long");
   // User text is always quoted, never evaluated as FTS operators.
   const std::set<std::string> stop = {"a","an","the","of","in","on","at","to","and","with","by","is","are","photo","picture","image","show","me"};
@@ -108,5 +140,5 @@ inline std::string scene_query(const std::string &input, bool depicted) {
       out += "(\"person\" OR \"people\" OR \"man\" OR \"woman\" OR \"men\" OR \"women\" OR \"child\" OR \"children\" OR \"boy\" OR \"girl\" OR \"rider\")";
     else out += "\"" + w + "\"";
   }
-  return out.empty() ? "" : (depicted ? "{caption depicted}: (" : "caption: (") + out + ")";
+  return out.empty() ? "" : "caption: (" + out + ")";
 }

@@ -37,7 +37,7 @@ class App {
     auto p = rows[0];
     p["tags"] = json::parse(p["tags"].get<std::string>());
     p.erase("original");
-    auto annotations = db.query("SELECT caption,depicted,status,error,manual,model_id FROM descriptions WHERE photo_id=?", {id});
+    auto annotations = db.query("SELECT caption,status,error,manual,model_id FROM descriptions WHERE photo_id=?", {id});
     p["description"] = annotations.empty() ? json(nullptr) : annotations[0];
     return p;
   }
@@ -139,13 +139,13 @@ class App {
 #endif
         caption = caption_process({env("CAPTION_BINARY"), "-m", env("CAPTION_MODEL"),
           "--mmproj", env("CAPTION_PROJECTOR"), "--image", input.string(),
-          "-p", "Describe the main scene in one short sentence.", "-n", "64", "-c", "1024",
+          "-p", CAPTION_PROMPT, "-n", "96", "-c", "1024",
           "-b", "64", "-ub", "64", "-t", "1", "-tb", "1", "--no-mmproj-offload", "--temp", "0", "-lv", "0"});
       }
       captioning = false;
       std::lock_guard<std::mutex> lock(data_mutex);
       db.run("UPDATE descriptions SET caption=?,status='ready',model_id=?,error='' WHERE photo_id=? AND manual=0 AND status='processing'",
-        {caption, env("CAPTION_MODEL_ID"), id});
+        {caption, env("CAPTION_MODEL_ID") + ":direct-v2", id});
     } catch (const std::exception &e) {
       captioning = false;
       std::lock_guard<std::mutex> lock(data_mutex);
@@ -327,15 +327,14 @@ public:
     server.Post(R"(/api/photos/(\d+)/description)", [this](const auto &q, auto &r) {
       const auto input = json::parse(q.body);
       const auto caption = input.at("caption").template get<std::string>();
-      const auto depicted = input.value("depicted", std::string());
-      if (caption.find_first_not_of(" \t\r\n") == std::string::npos || caption.size() > 1200 || depicted.size() > 1200)
-        throw std::runtime_error("Use a short description (up to 1,200 bytes per field)");
+      if (caption.find_first_not_of(" \t\r\n") == std::string::npos || caption.size() > 2401)
+        throw std::runtime_error("Use a short description (up to 2,401 bytes)");
       std::lock_guard<std::mutex> lock(data_mutex);
       auto id = std::stoll(q.matches[1]);
       if (db.query("SELECT id FROM photos WHERE id=?", {id}).empty()) {
         reply(r, {{"error", "Photo not found"}}, 404); return;
       }
-      db.run("UPDATE descriptions SET caption=?,depicted=?,manual=1,status='ready',error='' WHERE photo_id=?", {caption, depicted, id});
+      db.run("UPDATE descriptions SET caption=?,manual=1,status='ready',error='' WHERE photo_id=?", {caption, id});
       reply(r, {{"ok", true}});
     });
     server.Post(R"(/api/photos/(\d+)/description/retry)", [this](const auto &q, auto &r) {
@@ -367,12 +366,12 @@ public:
         throw std::runtime_error("Embedding space mismatch");
       const auto mode = request.value("mode", std::string("scene"));
       if (mode != "visual") {
-        if (mode != "scene" && mode != "depicted") throw std::runtime_error("Unknown search mode");
-        auto expression = scene_query(request.value("query", std::string()), mode == "depicted");
+        if (mode != "scene") throw std::runtime_error("Unknown search mode");
+        auto expression = scene_query(request.value("query", std::string()));
         std::lock_guard<std::mutex> lock(data_mutex);
         json rows = json::array();
         if (!expression.empty()) {
-          auto hits = db.query("SELECT rowid FROM scene_fts WHERE scene_fts MATCH ? ORDER BY bm25(scene_fts,1.0,0.5),rowid DESC LIMIT 60", {expression});
+          auto hits = db.query("SELECT rowid FROM scene_fts WHERE scene_fts MATCH ? ORDER BY bm25(scene_fts),rowid DESC LIMIT 60", {expression});
           for (auto &hit : hits) rows.push_back(photo(hit["rowid"]));
         }
         reply(r, {{"photos", rows}, {"mode", mode}}); return;

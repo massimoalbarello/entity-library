@@ -15,13 +15,13 @@ in persistent storage. Photos and inference stay on the instance; no external mo
 ## Use it
 
 Create your owner passkey and add JPEG/PNG photos or use the camera. Existing photos also get
-captions automatically. Open a photo to review or edit its description. Keep people or objects
-shown inside screens/pictures in the optional depicted-content field; ordinary scene searches
-exclude that field. Choose the combined mode to search it explicitly.
+captions automatically. Open a photo to review or edit its single description. Descriptions
+start directly with the subjects and include visible details such as colors, size, clothing
+and relationships to make them easier to find.
 
 Captions describe relationships such as “a dog lying beside a bicycle,” but can still omit or
-invent details. Automatic generation does not reliably separate depicted content yet; corrections
-are preserved. Scene search requires matching words (with English stemming), so try fewer words
+invent details. The prompt focuses on the main subjects rather than tiny content inside screens;
+this is not a guarantee of scene understanding. Your corrections are preserved. Scene search requires matching words (with English stemming), so try fewer words
 or Visual similarity for broader matching. Visual results use the existing 0.25 CLIP cutoff.
 
 The app does not produce accurate object boundaries or identify a specific person's belongings.
