@@ -48,8 +48,8 @@ clip_model_load: model loaded
 
 search results:
 distance path
-  0.674587 /home/xxxx/tests/red_apple.jpg
-  0.785591 /home/xxxx/tests/white.jpg
+  0.674587 /path/to/your/photos/first.jpg
+  0.785591 /path/to/your/photos/second.jpg
 ```
 
 note: lower score for search results is better as it indicates the distance, not the similarity.

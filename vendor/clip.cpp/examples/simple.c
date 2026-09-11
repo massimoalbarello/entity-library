@@ -4,9 +4,13 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-int main() {
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <image.jpg>\n", argv[0]);
+        return 1;
+    }
     char * model_path = "../../models/openai_clip-vit-base-patch32.q4_1.gguf";
-    char * img_path = "../../tests/red_apple.jpg";
+    char * img_path = argv[1];
     char * text = "an apple";
     int n_threads = 4;
     int verbosity = 1;

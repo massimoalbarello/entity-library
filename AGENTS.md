@@ -36,3 +36,6 @@ controls and hide empty status text so form spacing does not depend on incidenta
 Keep photo preview DOM nodes stable across metadata polling. Show preview, processing and
 description problems on the affected photo card with a visible marker and specific explanation;
 do not replace these with collection-wide warning counts. Provide recovery in the photo dialog.
+
+Keep sample photos, sample-library records and notebook execution outputs out of source control.
+Download test fixtures only into ignored, disposable build directories.
