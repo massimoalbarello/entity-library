@@ -24,3 +24,6 @@ palette. Preserve the original colors of photos and camera previews.
 Each photo has one editable description. Generate direct scene descriptions with visible
 attributes and relationships; avoid stock introductions such as “a picture of” or “in this image”.
 Do not add separate description fields for screen content or invent attributes to fill a template.
+
+Search always combines description BM25 and thresholded visual retrieval into one ranked list.
+Do not add a search mode selector or silently fall back to only one retrieval source.

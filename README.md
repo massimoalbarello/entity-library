@@ -4,9 +4,9 @@ A private Nibrun photo library with passkey sign-in, camera capture, short scene
 and photo search. Built from the patterns in [Face Library](https://github.com/massimoalbarello/face-library)
 and [PDF Signer](https://github.com/massimoalbarello/pdf-signer).
 
-**SmolVLM-500M-Instruct Q4_K_M** writes a short caption for each photo. Default search uses
-those captions through SQLite FTS5/BM25. **OpenCLIP ViT-B/32 LAION2B Q4_0** remains available
-in the separate Visual similarity mode.
+**SmolVLM-500M-Instruct Q4_K_M** writes a short caption for each photo. Every search combines
+those captions through SQLite FTS5/BM25 with visual similarity from **OpenCLIP ViT-B/32 LAION2B Q4_0**
+in one ranked list, with no mode selector.
 
 The frontend and native inference runtimes are embedded in one executable. Model files are
 downloaded once (about **481 MiB** total), checked against pinned SHA-256 hashes and cached
@@ -21,13 +21,13 @@ and relationships to make them easier to find.
 
 Captions describe relationships such as “a dog lying beside a bicycle,” but can still omit or
 invent details. The prompt focuses on the main subjects rather than tiny content inside screens;
-this is not a guarantee of scene understanding. Your corrections are preserved. Scene search requires matching words (with English stemming), so try fewer words
-or Visual similarity for broader matching. Visual results use the existing 0.25 CLIP cutoff.
+this is not a guarantee of scene understanding. Your corrections are preserved. Text matches use English stemming; visual matches help when the caption misses a word.
+Visual candidates retain the existing 0.25 CLIP cutoff. Matches from both sources rank higher.
 
 The app does not produce accurate object boundaries or identify a specific person's belongings.
 Maximums: 2,000 photos, 12 MiB per upload, 16 megapixels for PNGs. Originals are preserved.
-Captioning uses a single 512-pixel view and processes one photo at a time. Browsing and scene
-search remain available; visual inference pauses while captions are generated.
+Captioning uses a single 512-pixel view and processes one photo at a time. Browsing stays available during caption generation. Searches automatically wait for the current
+caption, then run both retrieval methods before returning results within the 1 GiB budget.
 
 ## Build and run
 

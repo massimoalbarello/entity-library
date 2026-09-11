@@ -6,6 +6,35 @@
 #include <map>
 #include <memory>
 constexpr size_t MAX_VIEWS = 10000;
+// Reciprocal rank fusion combines the two rankings without treating BM25 and
+// cosine similarity as comparable scores. Visual candidates are already gated
+// by the embedding model's threshold; text-only matches remain eligible.
+inline json hybrid_results(const json &text, const json &visual) {
+  std::map<int64_t, json> combined;
+  auto add = [&](const json &hits, const char *source) {
+    size_t rank = 0;
+    for (const auto &hit : hits) {
+      const auto id = hit["id"].get<int64_t>();
+      auto [it, inserted] = combined.try_emplace(id, json{{"id", id}, {"score", 0.0}, {"sources", json::array()}});
+      auto &row = it->second;
+      row["score"] = row["score"].get<double>() + 1.0 / (60 + ++rank);
+      row["sources"].push_back(source);
+      if (hit.contains("view_id")) {
+        row["view_id"] = hit["view_id"];
+        row["visual_score"] = hit["score"];
+      }
+    }
+  };
+  add(text, "text"); add(visual, "visual");
+  json rows = json::array();
+  for (auto &[id, row] : combined) rows.push_back(row);
+  std::sort(rows.begin(), rows.end(), [](const auto &a, const auto &b) {
+    if (a["score"] != b["score"]) return a["score"] > b["score"];
+    return a["id"] > b["id"];
+  });
+  while (rows.size() > 60) rows.erase(rows.end() - 1);
+  return rows;
+}
 struct ViewInfo {
   int64_t photo;
   int region;

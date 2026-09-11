@@ -35,6 +35,13 @@ int main() {
   SearchIndex boundary;
   boundary.add(1, at_similarity(cutoff), {1, 0});
   require(boundary.search(query).size() == 1, "Include the cutoff boundary");
+  const auto hybrid = hybrid_results(json::array({{{"id", 9}}, {{"id", 2}}}), rows);
+  require(hybrid.size() == 3, "Hybrid search unions both sources without duplicates");
+  require(hybrid[0]["id"] == 2 && hybrid[0]["sources"].size() == 2, "Agreement boosts matching photo");
+  require(hybrid[1]["id"] == 9 && !hybrid[1].contains("view_id"), "Text-only photo remains eligible");
+  require(hybrid[2]["id"] == 4 && hybrid[2]["sources"][0] == "visual", "Visual-only photo remains eligible");
+  require(hybrid[0]["visual_score"] == rows[0]["score"], "Keep cosine score distinct from fused score");
+  require(hybrid_results(json::array(), json::array()).empty(), "No padded hybrid results");
   std::cout
       << "PASS search threshold, weighting, aggregation and empty results\n";
 }

@@ -257,7 +257,6 @@ async function handle(request: Request) {
           tokens,
           space: manifest.space,
           query: url.searchParams.get("q") || "",
-          mode: url.searchParams.get("mode") || "scene",
         }),
         signal: request.signal,
       });

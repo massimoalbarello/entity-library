@@ -257,8 +257,25 @@ async function ready() {
     if (s.body.captioning && !sawCaptioning) {
       sawCaptioning = true;
       assert.equal((await api("/api/photos")).status, 200);
-      assert.equal((await api("/api/search?q=phone")).status, 200);
-      console.log("PASS browsing and scene search during caption inference");
+      const pending = await api("/api/search?q=phone");
+      assert.ok([200, 202].includes(pending.status));
+      if (pending.status === 202) assert.equal(pending.body.pending, true);
+      // A real UI search retries pending inference without any mode selection.
+      await page.locator("#query").fill("phone");
+      await page.getByRole("button", { name: "Search", exact: true }).click();
+      await page.waitForFunction(
+        () =>
+          document.querySelector("#results-title")?.textContent ===
+          "Results for “phone”",
+        null,
+        { timeout: 240000 },
+      );
+      await page
+        .getByRole("button", { name: "Clear search", exact: true })
+        .click();
+      console.log(
+        "PASS browsing and automatic hybrid-search retry during caption inference",
+      );
     }
     if (s.body.model.phase === "failed") throw Error(s.body.model.error);
     if (
@@ -376,7 +393,7 @@ try {
     await readFile(join(fixtures, "banana.jpg")),
   );
   for (const [q, id] of [["cat", cats.id]]) {
-    const result = await api("/api/search?mode=visual&q=" + q);
+    const result = await api("/api/search?q=" + q);
     assert.equal(result.status, 200);
     assert.equal(
       result.body.photos[0]?.id,
@@ -389,7 +406,7 @@ try {
       result.body.photos.map((p: any) => ({
         file: p.filename,
         score: p.score,
-        region: p.match.region,
+        region: p.match?.region,
       })),
     );
   }
@@ -409,13 +426,25 @@ try {
   }
   const scenes = await api("/api/search?q=cat");
   assert.equal(scenes.body.photos[0]?.id, cats.id);
+  assert.deepEqual(scenes.body.photos[0].sources, ["text", "visual"]);
+  // Removing the category word from the caption must retain visual retrieval.
+  await api(`/api/photos/${cats.id}/description`, "POST", {
+    caption: "Two animals resting indoors.",
+  });
+  const visualOnly = (await api("/api/search?q=cat")).body.photos.find(
+    (p: any) => p.id === cats.id,
+  );
+  assert.deepEqual(visualOnly.sources, ["visual"]);
+  await api(`/api/photos/${cats.id}/description`, "POST", {
+    caption: cats.description.caption,
+  });
   await page.getByRole("button", { name: "Clear search", exact: true }).click();
   await page.locator(`.photo-card[data-id="${banana.id}"]`).click();
   await page
     .locator("#scene-caption")
     .fill("A small black phone rests on stacked silver laptops.");
   assert.equal(await page.locator("#description-form textarea").count(), 1);
-  assert.equal(await page.locator("#search-mode option").count(), 2);
+  assert.equal(await page.locator("#search-mode").count(), 0);
   await page
     .getByRole("button", { name: "Save description", exact: true })
     .click();
@@ -433,14 +462,17 @@ try {
     (await api("/api/search?q=small%20black%20phone")).body.photos[0]?.id,
     banana.id,
   );
+  const textOnly = (
+    await api("/api/search?q=small%20black%20phone")
+  ).body.photos.find((p: any) => p.id === banana.id);
+  assert.deepEqual(textOnly.sources, ["text"]);
   console.log(
     "PASS real caption inference, BM25 adjective search and single description editor",
   );
   // This montage's weak banana match (~0.247) is intentionally filtered.
-  const weak = await api("/api/search?mode=visual&q=banana");
+  const weak = await api("/api/search?q=banana");
   assert.equal(weak.status, 200);
   assert.deepEqual(weak.body.photos, []);
-  await page.locator("#search-mode").selectOption("visual");
   await page.locator("#query").fill("banana");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.waitForFunction(
@@ -544,10 +576,7 @@ try {
   await start();
   await ready();
   assert.deepEqual((await api("/api/photos")).body.photos, before);
-  assert.equal(
-    (await api("/api/search?mode=visual&q=cat")).body.photos[0].id,
-    cats.id,
-  );
+  assert.equal((await api("/api/search?q=cat")).body.photos[0].id, cats.id);
   console.log(
     "PASS originals, embeddings, passkey session and retrieval survive restart",
   );
@@ -561,7 +590,7 @@ try {
     false,
   );
   assert.equal(
-    (await api("/api/search?mode=visual&q=cat")).body.photos.some(
+    (await api("/api/search?q=cat")).body.photos.some(
       (p: any) => p.id === cats.id,
     ),
     false,

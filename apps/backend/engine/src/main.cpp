@@ -22,6 +22,8 @@ class App {
   std::mutex data_mutex;
   std::mutex inference_mutex;
   std::atomic<bool> captioning{false};
+  std::atomic<int64_t> search_priority_until{0};
+  static int64_t ticks() { return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
   SearchIndex index;
   std::unique_ptr<Encoder> encoder;
   std::atomic<bool> stopping{false};
@@ -155,6 +157,11 @@ class App {
   }
   void run() {
     while (!stopping) {
+      // Let a pending interactive search run before starting another background job.
+      if (ticks() < search_priority_until) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        continue;
+      }
       json p;
       bool description = false;
       {
@@ -364,36 +371,32 @@ public:
       auto request = json::parse(q.body);
       if (request["space"] != MODEL["space"])
         throw std::runtime_error("Embedding space mismatch");
-      const auto mode = request.value("mode", std::string("scene"));
-      if (mode != "visual") {
-        if (mode != "scene") throw std::runtime_error("Unknown search mode");
-        auto expression = scene_query(request.value("query", std::string()));
-        std::lock_guard<std::mutex> lock(data_mutex);
-        json rows = json::array();
-        if (!expression.empty()) {
-          auto hits = db.query("SELECT rowid FROM scene_fts WHERE scene_fts MATCH ? ORDER BY bm25(scene_fts),rowid DESC LIMIT 60", {expression});
-          for (auto &hit : hits) rows.push_back(photo(hit["rowid"]));
-        }
-        reply(r, {{"photos", rows}, {"mode", mode}}); return;
-      }
+      const auto expression = scene_query(request.value("query", std::string()));
+      search_priority_until = ticks() + 3000;
       Vector v;
       {
         std::unique_lock<std::mutex> lock(inference_mutex, std::try_to_lock);
-        if (!lock.owns_lock()) { reply(r, {{"error", "Visual search is busy preparing a photo. Scene search is available."}}, 503); return; }
+        if (!lock.owns_lock()) { reply(r, {{"pending", true}}, 202); return; }
         if (!encoder) encoder = std::make_unique<Encoder>(env("MODEL_FILE"));
         v = encoder->text(
             request["tokens"].template get<std::vector<int32_t>>());
       }
       std::lock_guard<std::mutex> lock(data_mutex);
-      auto hits = index.search(v);
+      search_priority_until = 0;
+      auto text_hits = expression.empty() ? json::array() : db.query("SELECT rowid AS id FROM scene_fts WHERE scene_fts MATCH ? ORDER BY bm25(scene_fts),rowid DESC LIMIT 60", {expression});
+      auto hits = hybrid_results(text_hits, index.search(v));
       json rows = json::array();
       for (auto &hit : hits) {
         auto p = photo(hit["id"]);
         p["score"] = hit["score"];
+        p["sources"] = hit["sources"];
+        if (hit.contains("visual_score")) p["visual_score"] = hit["visual_score"];
+        if (hit.contains("view_id")) {
         auto region = db.query("SELECT x,y,w,h,region FROM views WHERE id=?",
                                {hit["view_id"]});
         if (!region.empty())
           p["match"] = region[0];
+        }
         rows.push_back(p);
       }
       reply(r, {{"photos", rows}});

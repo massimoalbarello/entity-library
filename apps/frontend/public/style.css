@@ -721,23 +721,6 @@ dialog .close {
   }
 }
 
-.search-options {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 16px 0;
-  color: var(--muted);
-  flex-wrap: wrap;
-}
-.search-options select {
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 12px;
-  max-width: 100%;
-}
 #description-form label {
   display: block;
   font-weight: 600;
