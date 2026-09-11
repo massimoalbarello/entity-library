@@ -1,0 +1,67 @@
+name: Checks and release
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - uses: docker/setup-buildx-action@v3
+      - name: Build static Linux engine
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.build
+          platforms: linux/amd64
+          outputs: type=local,dest=build/core-release
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Compile app
+        run: bun run build
+        env:
+          CORE_BINARY: build/core-release/entity-core
+      - run: bun run check
+      - run: bun test
+      - name: Install camera test dependency
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+      - run: bun run test:linux
+      - name: Package binary and notices
+        run: |
+          mkdir release
+          cp apps/backend/dist/entity-library LICENSE THIRD-PARTY.md release/
+          tar -czf release/third-party-notices.tar.gz vendor/*LICENSE* vendor/AUTH-LICENSES vendor/OPENCV-THIRD-PARTY vendor/clip.cpp/LICENSE vendor/clip.cpp/ggml/LICENSE
+          cd release
+          sha256sum entity-library > SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: entity-library-linux-x64
+          path: release/
+          if-no-files-found: error
+  publish:
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: entity-library-linux-x64
+          path: release
+      - name: Publish checked version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" release/* --title "Entity Library $RELEASE_TAG" --generate-notes

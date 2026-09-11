@@ -1,0 +1,9 @@
+node_modules/
+build/
+data/
+apps/backend/dist/
+apps/backend/src/assets.gen.ts
+apps/frontend/dist/
+.env
+.nibrun.json
+.DS_Store

@@ -1,0 +1,16 @@
+{
+  "slug": "entity-library-gf84pk",
+  "url": "https://entity-library-gf84pk.nibrun.app",
+  "deploymentId": "01a090ad-392b-72c8-aaf7-21f5ab08ab5c",
+  "sha256": "d77df5df066ca94e275eb617fa01a7120263c1dc1cfe928a2596ef620ad8eb09",
+  "deployedAt": "2026-09-11T13:34:29Z",
+  "observedMemoryBytes": 268435456,
+  "plannedMemoryBytes": 1073741824,
+  "checks": {
+    "httpsHealth": 200,
+    "unauthenticatedLibrary": 401,
+    "ownerRegistered": false,
+    "modelFilesInstalled": true
+  },
+  "inferenceOnPersonalDeployment": "not exercised; owner passkey must be created by user"
+}

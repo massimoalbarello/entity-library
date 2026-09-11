@@ -1,0 +1,31 @@
+{
+  "id": "openclip-b32-laion2b-q4-r1",
+  "space": "openclip-b32-laion2b-q4-bicubic-hf-bpe-v1",
+  "dimensions": 512,
+  "imageSize": 224,
+  "contextLength": 77,
+  "runtime": "clip.cpp",
+  "runtimeRevision": "913458d5d1c9238380a0b0826cd1e71c8828a82d",
+  "upstream": "https://huggingface.co/laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+  "license": "MIT",
+  "artifacts": [
+    {
+      "name": "model.gguf",
+      "url": "https://huggingface.co/mys/ggml_CLIP-ViT-B-32-laion2B-s34B-b79K/resolve/26ebd3e1648320e965df9e69ca01963d144cb380/CLIP-ViT-B-32-laion2B-s34B-b79K_ggml-model-q4_0.gguf",
+      "sha256": "66aa926f26c468a5eb400e97b8bbcf80444f6f0fc59d6927f8bea47548a04ce2",
+      "bytes": 90035008
+    },
+    {
+      "name": "tokenizer.json",
+      "url": "https://huggingface.co/laion/CLIP-ViT-B-32-laion2B-s34B-b79K/resolve/1a25a446712ba5ee05982a381eed697ef9b435cf/tokenizer.json",
+      "sha256": "b556ac8c99757ffb677208af34bc8c6721572114111a6e0aaf5fa69ff0b8d842",
+      "bytes": 2224041
+    },
+    {
+      "name": "tokenizer_config.json",
+      "url": "https://huggingface.co/laion/CLIP-ViT-B-32-laion2B-s34B-b79K/resolve/1a25a446712ba5ee05982a381eed697ef9b435cf/tokenizer_config.json",
+      "sha256": "e19f34ef773563fb695f96cfcae1e4c7b112ab6ad532f6962061df5242d924f0",
+      "bytes": 904
+    }
+  ]
+}

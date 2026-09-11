@@ -1,0 +1,28 @@
+{
+  "name": "entity-library",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run build:local && ./apps/backend/dist/entity-library",
+    "build": "bun scripts/build.ts",
+    "build:local": "BUILD_TARGET=host bun scripts/build.ts",
+    "check": "tsc --noEmit",
+    "test": "bun test apps/backend/test",
+    "test:browser": "bun scripts/test-browser.ts",
+    "test:linux": "TEST_LINUX=1 bun scripts/test-browser.ts",
+    "format": "prettier --write \"apps/**/*.ts\" \"apps/frontend/public/*.{js,css,html}\" \"scripts/*.ts\" \"*.json\""
+  },
+  "dependencies": {
+    "better-auth": "1.7.4",
+    "@better-auth/passkey": "1.7.4",
+    "@ilbertt/better-auth-bun-sql": "0.4.0",
+    "@huggingface/tokenizers": "0.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "playwright-core": "1.63.0",
+    "prettier": "3.9.6",
+    "typescript": "7.0.2"
+  }
+}

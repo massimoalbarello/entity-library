@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "binaryBytes": 89552072,
+  "sha256": "d77df5df066ca94e275eb617fa01a7120263c1dc1cfe928a2596ef620ad8eb09",
+  "memory": {
+    "peakBytes": 473722880,
+    "peakMiB": 451.77734375,
+    "limitMiB": 1024,
+    "cpus": 1,
+    "platform": "Linux amd64",
+    "note": "Docker Desktop CPU emulation on macOS"
+  },
+  "model": "openclip-b32-laion2b-q4-r1",
+  "deployment": "not deployed"
+}
