@@ -1,16 +1,16 @@
 {
   "slug": "entity-library-gf84pk",
   "url": "https://entity-library-gf84pk.nibrun.app",
-  "deploymentId": "01a090ad-392b-72c8-aaf7-21f5ab08ab5c",
-  "sha256": "d77df5df066ca94e275eb617fa01a7120263c1dc1cfe928a2596ef620ad8eb09",
-  "deployedAt": "2026-09-11T13:34:29Z",
-  "observedMemoryBytes": 268435456,
+  "deploymentId": "01a090c6-e1a8-71f7-ac65-1201642a0f15",
+  "sha256": "b7782b751a61082106d845d1ce13d3287a1d2dd51b2b8cbc1129b220a734b879",
+  "deployedAt": "2026-09-11T14:03:48.932577+00:00",
+  "observedMemoryBytes": 1073741824,
   "plannedMemoryBytes": 1073741824,
   "checks": {
     "httpsHealth": 200,
     "unauthenticatedLibrary": 401,
-    "ownerRegistered": false,
+    "ownerRegistered": true,
     "modelFilesInstalled": true
   },
-  "inferenceOnPersonalDeployment": "not exercised; owner passkey must be created by user"
+  "inferenceOnPersonalDeployment": "Existing owner session and 19 photos visible after update; threshold verified with disposable local inference and Linux browser tests"
 }

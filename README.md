@@ -17,6 +17,9 @@ Create your owner passkey, add JPEG/PNG photos or use the camera, then search fo
 as “banana”, “cat”, or “a red car”. The app indexes the whole photo and four overlapping crops,
 so a smaller object has a better chance of being found. It also suggests up to three labels.
 
+Search returns only matches scoring at least 0.25, configured per model in the manifest.
+Weak matches are omitted, so searches can return no results.
+
 Labels and search results are approximate. This version recognizes visual categories and
 scenes; it does not identify a particular person's mug across photos, count objects, or produce
 accurate object boundaries. The current label vocabulary is English; search accepts free text,

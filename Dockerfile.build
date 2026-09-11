@@ -25,6 +25,7 @@ COPY . .
 RUN cmake -S apps/backend/engine -B build -DCMAKE_BUILD_TYPE=MinSizeRel \
  -DOpenCV_DIR=/opt/opencv/lib/cmake/opencv4 -DCMAKE_EXE_LINKER_FLAGS=-static -DCLIP_STATIC=ON \
  && cmake --build build -j2 \
+ && ctest --test-dir build --output-on-failure \
  && strip build/entity-core
 FROM scratch AS binary
 COPY --from=build /src/build/entity-core /entity-core

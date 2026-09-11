@@ -27,5 +27,8 @@
       "sha256": "e19f34ef773563fb695f96cfcae1e4c7b112ab6ad532f6962061df5242d924f0",
       "bytes": 904
     }
-  ]
+  ],
+  "retrieval": {
+    "minSimilarity": 0.25
+  }
 }

@@ -13,10 +13,16 @@ struct ViewInfo {
 class SearchIndex {
   hnswlib::InnerProductSpace space{MODEL["dimensions"].get<size_t>()};
   std::unique_ptr<hnswlib::HierarchicalNSW<float>> graph;
+  const float minSimilarity =
+      MODEL.at("retrieval").at("minSimilarity").get<float>();
 
 public:
   std::map<int64_t, ViewInfo> views;
-  SearchIndex() { reset(); }
+  SearchIndex() {
+    if (!std::isfinite(minSimilarity) || minSimilarity < 0 || minSimilarity > 1)
+      throw std::runtime_error("Invalid model retrieval threshold");
+    reset();
+  }
   void reset() {
     graph = std::make_unique<hnswlib::HierarchicalNSW<float>>(&space, 1024, 16,
                                                               120, 42);
@@ -72,7 +78,7 @@ public:
               [](auto &a, auto &b) { return a.second.first > b.second.first; });
     json rows = json::array();
     for (auto &[photo, result] : ordered) {
-      if (result.first < .18f || rows.size() >= 60)
+      if (result.first < minSimilarity || rows.size() >= 60)
         break;
       rows.push_back(
           {{"id", photo}, {"score", result.first}, {"view_id", result.second}});

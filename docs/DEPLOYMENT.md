@@ -6,18 +6,16 @@ App slug: `entity-library-gf84pk`. Redeploy this same app to preserve its hostna
 photos and downloaded models. The local `.nibrun.json` records that target and is ignored by Git.
 
 The deployed executable is the tested Linux build, SHA-256
-`d77df5df066ca94e275eb617fa01a7120263c1dc1cfe928a2596ef620ad8eb09`.
-Deployment ID: `01a090ad-392b-72c8-aaf7-21f5ab08ab5c`.
+`b7782b751a61082106d845d1ce13d3287a1d2dd51b2b8cbc1129b220a734b879`.
+Deployment ID: `01a090c6-e1a8-71f7-ac65-1201642a0f15`.
 
-HTTPS `/health` returned 200, unauthenticated `/api/photos` returned 401, and the model and
-both tokenizer files are installed at their expected sizes. Ownership was unclaimed at the
-post-deployment check; the user should create their passkey in the app. No owner registration,
-photo uploads or destructive integration tests were performed on this deployment.
+HTTPS `/health` returned 200 and unauthenticated `/api/photos` returned 401 after the
+similarity-cutoff update. The owner registered their passkey and added 19 public sample photos
+before this update. Destructive and ownership tests run only on disposable local instances.
 
-**Allocation mismatch:** Nibrun provisioned 256 MiB, while this app was validated with a 1 GiB
-limit. Its initial reported usage was about 186 MiB. The installed CLI offers no RAM setting;
-the planned 1 GB must be enabled on the platform side. Startup usage is not proof that indexing
-large photos will fit in 256 MiB.
+Nibrun now reports **1 GiB RAM**, resolving the initial 256 MiB allocation mismatch. The
+updated executable passed the Linux browser suite at 1 CPU / 1 GiB, with a 453.6 MiB cgroup
+peak including charged file cache and the local x86 emulation overhead.
 
 To redeploy a newly built and tested Linux executable:
 

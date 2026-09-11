@@ -55,8 +55,11 @@ Deletion while processing is checked before the worker commits its results.
 
 HNSW is rebuilt from SQLite at startup. It is derived data, so there is no second persistent
 index to keep transactionally synchronized. Retrieval takes up to 200 view matches, retains
-the best match per photo, slightly discounts crops, and returns up to 60 photos. The similarity
-cutoff and label threshold are initial heuristics, not calibrated confidence probabilities.
+the best match per photo, slightly discounts crops, and returns up to 60 photos scoring at
+least the model manifest's `retrieval.minSimilarity` (currently **0.25**, previously 0.18).
+The cutoff applies after crop weighting; weak matches never fill unused result slots, and
+search may return no photos. Changing this cutoff needs no reindex because vectors are unchanged.
+The similarity cutoff and label threshold are heuristics, not calibrated confidence probabilities.
 A score is not displayed as an accuracy percentage. The crop coordinates are not detector boxes.
 
 ## Reusing this for the next model

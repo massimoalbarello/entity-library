@@ -29,7 +29,7 @@ for (const [name, url] of [
     "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/coco_sample.png",
   ],
 ]) {
-  const r = await fetch(url!);
+  const r = await fetch(url!, { signal: AbortSignal.timeout(30_000) });
   if (!r.ok) throw Error("Could not download public test fixture");
   await Bun.write(join(fixtures, name!), r);
 }
@@ -289,10 +289,7 @@ try {
     ).body(),
     await readFile(join(fixtures, "banana.jpg")),
   );
-  for (const [q, id] of [
-    ["banana", banana.id],
-    ["cat", cats.id],
-  ]) {
+  for (const [q, id] of [["cat", cats.id]]) {
     const result = await api("/api/search?q=" + q);
     assert.equal(result.status, 200);
     assert.equal(
@@ -310,12 +307,25 @@ try {
       })),
     );
   }
+  // This montage's weak banana match (~0.247) is intentionally filtered.
+  const weak = await api("/api/search?q=banana");
+  assert.equal(weak.status, 200);
+  assert.deepEqual(weak.body.photos, []);
   await page.locator("#query").fill("banana");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.waitForFunction(
     () =>
       document.querySelector("#results-title")?.textContent ===
       "Results for “banana”",
+  );
+  assert.equal(await page.locator("#results-count").textContent(), "0 photos");
+  assert.ok(await page.locator("#empty h2").isVisible());
+  await page.locator("#query").fill("cat");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#results-title")?.textContent ===
+      "Results for “cat”",
   );
   await page.screenshot({
     path: join(out, "search-desktop.png"),

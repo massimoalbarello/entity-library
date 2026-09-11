@@ -23,3 +23,11 @@ if(UNIX AND NOT APPLE)
  # This reserves address space, not 8 MiB of resident memory per thread.
  target_link_options(entity-core PRIVATE "-Wl,-z,stack-size=8388608")
 endif()
+
+include(CTest)
+if(BUILD_TESTING)
+ add_executable(search-test tests/search.cpp)
+ target_include_directories(search-test PRIVATE src ${ROOT}/vendor ${ROOT}/vendor/clip.cpp/ggml/include ${CMAKE_BINARY_DIR}/generated)
+ target_link_libraries(search-test PRIVATE clip sqlite ${OpenCV_LIBS})
+ add_test(NAME search-threshold COMMAND search-test)
+endif()

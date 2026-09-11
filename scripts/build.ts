@@ -19,6 +19,7 @@ if (!process.env.CORE_BINARY) {
       "-DCMAKE_BUILD_TYPE=Release",
     ]);
     await run(["cmake", "--build", build, "-j4"]);
+    await run(["ctest", "--test-dir", build, "--output-on-failure"]);
   } else
     await run([
       "docker",
