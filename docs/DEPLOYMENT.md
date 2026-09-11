@@ -6,23 +6,23 @@ App slug: `entity-library-gf84pk`. Redeploy this same app to preserve its hostna
 photos and downloaded models. The local `.nibrun.json` records that target and is ignored by Git.
 
 The deployed executable is the tested Linux build, SHA-256
-`5e79225c1ef3f50210733191a14bd2df9bdc879c219148ae81700f596c885fbd`.
-Deployment ID: `01a09146-6ee2-77be-99a4-d81d04af7477`.
+`c516572ed7681f0c77d7d866b4e8772d92ad7ab7417549d3cb9aa7c5669f65ed`.
+Deployment ID: `01a0916a-442c-73e6-a105-77382b0b6e40`.
 
-The executable was downloaded from the successful [checked build](https://github.com/massimoalbarello/entity-library/actions/runs/34621071034)
-for source commit `46d056ed496e127e615a02517e0dfd7a535afffc`, verified against the workflow's
+The executable was downloaded from the successful [checked build](https://github.com/massimoalbarello/entity-library/actions/runs/34624799699)
+for source commit `47d6f06adb64506a38da6431274469137214b19c`, verified against the workflow's
 SHA256SUMS, and then uploaded to the existing app. The served JavaScript matches the checked
-source byte for byte. Every search combines BM25 description matches and thresholded
-visual matches with reciprocal rank fusion, with no mode selector. The single description
-field and monochrome palette are retained. The suggested-query row and its event handlers/styles are removed. Desktop and mobile
-previews were checked; live JavaScript and CSS match checked source. The description form
-now has a measured 16px field-to-action gap, 12px between action buttons, and hidden empty
-status text. Desktop and mobile dialog previews were checked.
+source byte for byte. Cards keep their image elements across metadata polls so slow previews
+finish loading. Preview, photo-processing and description errors appear on the affected cards
+with an exclamation marker and specific message. Collection-level photo warning counts are
+removed; failed previews have an in-dialog retry action. Desktop and mobile states were checked.
 
-HTTPS `/health` returned 200 and unauthenticated `/api/search?q=cat` returned 401. This update
-adjusts description-form spacing without changing retrieval, model identities, vectors or description
-schema. The preceding single-description migration verified preservation of 20 original
-photos and 100 embeddings. No reindex or caption regeneration is requested by this update.
+HTTPS `/health` returned 200 and unauthenticated `/assets/photos/13` returned 401. Both served
+JavaScript and CSS match checked source. The pre-update library snapshot contained all 20
+saved previews and no photo-processing errors. The one description failure belonged to
+`Sample 13 - pizza.jpg` and reported `No useful description generated`; the UI explains that
+the generated description was too short. This frontend update does not change stored photos,
+embeddings, captions or schema.
 
 Nibrun reports **1 GiB RAM** and one vCPU. The complete local Linux browser suite peaked at
 **953.6 MiB**, including charged file cache and local x86 emulation overhead. The cloud workflow

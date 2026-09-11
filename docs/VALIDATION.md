@@ -159,3 +159,22 @@ source `75493edff9e4a09a2bfff176dc9b487f8fc52e78`.
   health returns 200, and unauthenticated search returns 401.
 - The Linux suite passed under 1 CPU / 1 GiB with a 326.4 MiB cgroup counter; the shared-cache
   caveat above still applies. This is not a total-RAM estimate.
+
+
+## Stable previews and per-card errors — 11 September 2026
+
+Checked build: [34624799699](https://github.com/massimoalbarello/entity-library/actions/runs/34624799699),
+source `47d6f06adb64506a38da6431274469137214b19c`.
+
+- Reproduced the old renderer replacing image nodes at each 2.5-second metadata poll.
+  The new keyed cards preserve image nodes and in-flight requests, including when caption
+  metadata changes. An uncached preview delayed 3.5 seconds loads with exactly one request.
+- Browser tests simulate a description error while a previous caption remains, verify the
+  marker and specific text, then verify the marker clears when the error resolves.
+- A failed preview remains marked through polling, exposes a retry in its dialog, and restores
+  the image and clears the warning after a successful retry. Invalid photo uploads also show
+  a card marker and processing error. The global warning banner stays empty in these cases.
+- Local and Linux real-inference/authentication/persistence suites passed. Error-state previews
+  were reviewed on desktop and mobile, with top-aligned cards and retained monochrome styling.
+- The Linux suite ran under 1 CPU / 1 GiB. Its 325.9 MiB cgroup counter has the shared-cache
+  caveat above and is not a total-RAM estimate. Live assets match the checked source.
