@@ -6,22 +6,20 @@ App slug: `entity-library-gf84pk`. Redeploy this same app to preserve its hostna
 photos and downloaded models. The local `.nibrun.json` records that target and is ignored by Git.
 
 The deployed executable is the tested Linux build, SHA-256
-`a90b556867f23f72c2018cb1b2e9cfc165471418dd2212b292a08568772c6c4a`.
-Deployment ID: `01a09129-c6d5-7565-b12a-15376b83e3cd`.
+`789f45f2c96e6e81f6ab789c2b3cdad22b1cd41fd02cbfc265a16a289fc44da6`.
+Deployment ID: `01a09135-b14f-70d0-8999-91b6575bc3ef`.
 
-The executable was downloaded from the successful [checked build](https://github.com/massimoalbarello/entity-library/actions/runs/34617808811)
-for source commit `e0a48301aa5129f18e7771a1bc1c4378fd2dbc63`, verified against the workflow's
+The executable was downloaded from the successful [checked build](https://github.com/massimoalbarello/entity-library/actions/runs/34619180156)
+for source commit `75493edff9e4a09a2bfff176dc9b487f8fc52e78`, verified against the workflow's
 SHA256SUMS, and then uploaded to the existing app. The served JavaScript matches the checked
-source byte for byte, with one description field and two search choices: Descriptions and
-Visual similarity. Face Library’s black, white and neutral-gray palette is retained.
+source byte for byte. Every search now combines BM25 description matches and thresholded
+visual matches with reciprocal rank fusion, with no mode selector. The single description
+field and monochrome palette are retained. Both live JavaScript and CSS match checked source.
 
-HTTPS `/health` returned 200 and unauthenticated `/api/photos` returned 401. Before/after
-snapshots confirmed all **20 original photo files**, all photo/view records, and all **100
-embedding records** were unchanged. The second description column was removed. At the
-verification snapshot, one refreshed description was ready, one was processing, eighteen
-were queued, and none had failed. Automatic descriptions continue to regenerate in the app.
-The first live result describes a tabby cat with a green collar lying on a leather recliner
-with a remote control beside it. Cached model weights were reused.
+HTTPS `/health` returned 200 and unauthenticated `/api/search?q=cat` returned 401. This update
+changes retrieval and scheduling without changing model identities, vectors or description
+schema. The preceding single-description migration verified preservation of 20 original
+photos and 100 embeddings. No reindex or caption regeneration is requested by this update.
 
 Nibrun reports **1 GiB RAM** and one vCPU. The complete local Linux browser suite peaked at
 **953.6 MiB**, including charged file cache and local x86 emulation overhead. The cloud workflow

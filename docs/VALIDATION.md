@@ -141,3 +141,21 @@ source `e0a48301aa5129f18e7771a1bc1c4378fd2dbc63`.
   This still misattributes some colors/objects in the stacked-laptop photo. The local model
   also inserted an unsupported phone brand despite instructions; prompt changes improve
   description style, not factual guarantees. Manual corrections remain available.
+
+
+## Always-combined search — 11 September 2026
+
+Checked build: [34619180156](https://github.com/massimoalbarello/entity-library/actions/runs/34619180156),
+source `75493edff9e4a09a2bfff176dc9b487f8fc52e78`.
+
+- Native checks cover union, deduplication, agreement boosting, text-only and visual-only
+  eligibility, preserving the raw cosine score, empty results and the existing visual cutoff.
+- Local and Linux real-inference browser suites passed. Removing “cat” from the caption still
+  retrieves the cat visually; an unrelated photo with an edited phone description matches
+  through text alone. A photo matching both reports both sources and ranks first.
+- A search submitted during real caption inference automatically retries HTTP 202 responses
+  and completes with combined results. Browsing remains available. Both models remain serialized.
+- Desktop and mobile screenshots show no selector. The live assets match the checked build,
+  health returns 200, and unauthenticated search returns 401.
+- The Linux suite passed under 1 CPU / 1 GiB with a 326.4 MiB cgroup counter; the shared-cache
+  caveat above still applies. This is not a total-RAM estimate.

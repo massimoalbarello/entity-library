@@ -54,13 +54,19 @@ cascades through the views and vectors, rebuilds the small search index and remo
 Deletion while processing is checked before the worker commits its results.
 
 HNSW is rebuilt from SQLite at startup. It is derived data, so there is no second persistent
-index to keep transactionally synchronized. Retrieval takes up to 200 view matches, retains
+index to keep transactionally synchronized. Visual retrieval takes up to 200 view matches, retains
 the best match per photo, slightly discounts crops, and returns up to 60 photos scoring at
 least the model manifest's `retrieval.minSimilarity` (currently **0.25**, previously 0.18).
 The cutoff applies after crop weighting; weak matches never fill unused result slots, and
-search may return no photos. Changing this cutoff needs no reindex because vectors are unchanged.
+the visual candidate list may be empty. Changing this cutoff needs no reindex because vectors are unchanged.
 The similarity cutoff and label threshold are heuristics, not calibrated confidence probabilities.
 A score is not displayed as an accuracy percentage. The crop coordinates are not detector boxes.
+
+Every search also queries the single description FTS5 index, ranked by BM25. The native
+engine merges both candidate lists using equal-weight reciprocal rank fusion, deduplicates
+photos, and returns at most 60 results. A match from either source is eligible; agreement
+boosts its rank. The fused score is distinct from CLIP cosine similarity. See
+[scene descriptions](SCENE-DESCRIPTIONS.md) for the ranking and memory-scheduling contract.
 
 ## Reusing this for the next model
 
