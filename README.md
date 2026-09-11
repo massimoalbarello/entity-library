@@ -25,6 +25,11 @@ this is not a guarantee of scene understanding. Your corrections are preserved. 
 Visual candidates retain the existing 0.25 CLIP cutoff. Matches from both sources rank higher.
 
 The app does not produce accurate object boundaries or identify a specific person's belongings.
+Problems are shown on the affected photo card with an exclamation marker and a specific
+preview, photo-processing or description message. Open that photo to retry its preview or
+processing, retry a failed description, or edit the description. Background metadata refreshes
+preserve image elements so slow previews can finish loading.
+
 Maximums: 2,000 photos, 12 MiB per upload, 16 megapixels for PNGs. Originals are preserved.
 Captioning uses a single 512-pixel view and processes one photo at a time. Browsing stays available during caption generation. Searches automatically wait for the current
 caption, then run both retrieval methods before returning results within the 1 GiB budget.

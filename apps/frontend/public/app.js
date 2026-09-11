@@ -85,6 +85,7 @@ async function signOut() {
   signedIn = false;
   modelReady = false;
   photos = [];
+  previewFailures.clear();
   query = "";
   generation++;
   searchAbort?.abort();
@@ -143,6 +144,96 @@ function showPhotos() {
   renderPhotos();
   if (modelReady) runSearch(query);
 }
+const previewFailures = new Map();
+function descriptionProblem(error) {
+  if (error === "No useful description generated")
+    return "The generated description was too short. Open to retry or write one.";
+  if (error === "No description generated")
+    return "No description was returned. Open to retry or write one.";
+  return error || "Could not generate a description. Open to retry or edit.";
+}
+function photoIssues(p) {
+  const issues = [];
+  if (previewFailures.has(String(p.id)))
+    issues.push("Preview failed to load. Open to retry.");
+  if (p.status === "error")
+    issues.push(
+      `Photo: ${p.error || "Could not prepare this photo. Open to retry."}`,
+    );
+  if (p.description?.status === "error")
+    issues.push(`Description: ${descriptionProblem(p.description.error)}`);
+  return issues;
+}
+function paintCardIssues(card, p) {
+  const issues = photoIssues(p);
+  card.classList.toggle("has-issue", issues.length > 0);
+  $(".issue-badge", card).hidden = !issues.length;
+  $(".issue-badge", card).title = issues.join("\n");
+  $(".card-issues", card).innerHTML = issues
+    .map((text) => `<p>${esc(text)}</p>`)
+    .join("");
+}
+function previewImage(p, onChange, lazy = true) {
+  const img = document.createElement("img");
+  img.alt = p.filename;
+  img.loading = lazy ? "lazy" : "eager";
+  img.decoding = "async";
+  img.onload = () => {
+    previewFailures.delete(String(p.id));
+    img.hidden = false;
+    onChange(false);
+  };
+  img.onerror = () => {
+    previewFailures.set(String(p.id), true);
+    img.hidden = true;
+    onChange(true);
+  };
+  img.src = `/assets/photos/${p.id}`;
+  return img;
+}
+function photoCard(p, card) {
+  if (!card) {
+    card = document.createElement("button");
+    card.className = "photo-card";
+    card.dataset.id = p.id;
+    card.innerHTML =
+      '<div class="picture"><div class="preview-content"></div><span class="issue-badge" aria-label="Photo needs attention" hidden>!</span></div><div class="caption"><div class="filename"></div><div class="photo-tags"></div><div class="card-progress"></div><div class="card-issues"></div></div>';
+    card.onclick = () => detail(card.dataset.id);
+  }
+  // Metadata polls must not replace in-flight or already loaded image elements.
+  if (card.dataset.photoStatus !== p.status) {
+    card.dataset.photoStatus = p.status;
+    const preview = $(".preview-content", card);
+    preview.replaceChildren();
+    if (p.status === "ready") {
+      const state = document.createElement("div");
+      state.className = "photo-state";
+      state.hidden = true;
+      state.textContent = "Preview unavailable";
+      const img = previewImage(p, (failed) => {
+        state.hidden = !failed;
+        paintCardIssues(card, photos.find((photo) => photo.id === p.id) || p);
+      });
+      preview.append(img, state);
+    } else {
+      preview.innerHTML = `<div class="photo-state">${p.status === "error" ? "Photo could not be prepared" : "Preparing photo…"}</div>`;
+    }
+  }
+  $(".filename", card).textContent = p.filename;
+  $(".photo-tags", card).textContent = p.description?.caption || "";
+  const progress = $(".card-progress", card);
+  progress.textContent =
+    p.status === "ready" &&
+    ["queued", "processing"].includes(p.description?.status)
+      ? p.description?.caption
+        ? "Updating description…"
+        : "Writing description…"
+      : "";
+  progress.hidden = !progress.textContent;
+  paintCardIssues(card, p);
+  return card;
+}
+
 function renderPhotos() {
   if (!signedIn || currentView !== "photos") return;
   $("#results-title").textContent = query
@@ -150,15 +241,19 @@ function renderPhotos() {
     : "All photos";
   $("#results-count").textContent =
     `${photos.length} ${photos.length === 1 ? "photo" : "photos"}`;
-  $("#grid").innerHTML = photos
-    .map(
-      (p) =>
-        `<button class="photo-card" data-id="${p.id}"><div class="picture">${p.status === "ready" ? `<img src="/assets/photos/${p.id}" loading="lazy" alt="${esc(p.filename)}">` : `<div class="photo-state ${p.status === "error" ? "error" : ""}">${p.status === "error" ? "Could not read photo" : "Preparing photo…"}</div>`}</div><div class="caption"><div class="filename">${esc(p.filename)}</div><div class="photo-tags">${esc(p.description?.caption || (p.description?.status === "error" ? "Description needs attention" : p.status === "ready" ? "Writing a description…" : p.status))}</div></div></button>`,
-    )
-    .join("");
-  $("#grid")
-    .querySelectorAll("[data-id]")
-    .forEach((b) => (b.onclick = () => detail(b.dataset.id)));
+  const grid = $("#grid");
+  const existing = new Map(
+    [...grid.children].map((card) => [card.dataset.id, card]),
+  );
+  const wanted = new Set(photos.map((p) => String(p.id)));
+  for (const card of [...grid.children]) {
+    if (!wanted.has(card.dataset.id)) existing.get(card.dataset.id)?.remove();
+  }
+  photos.forEach((p, i) => {
+    const card = photoCard(p, existing.get(String(p.id)));
+    if (grid.children[i] !== card)
+      grid.insertBefore(card, grid.children[i] || null);
+  });
   $("#empty").innerHTML = photos.length
     ? ""
     : `<div class="empty"><div class="empty-icon">${icon(query ? "search" : "photo")}</div><h2>${query ? "Nothing here just yet." : "Start with a photo."}</h2><p class="sub">${query ? "Try fewer words or describe the colors, objects, or setting." : "Upload a few photos or take one with your camera. Then find the things inside with a simple search."}</p>${query ? "" : '<button class="primary" id="empty-add">Add your first photos</button>'}</div>`;
@@ -271,14 +366,7 @@ async function poll() {
             toast(e.message);
           }
         });
-      } else
-        notice.innerHTML = status.queued
-          ? `<div class="notice">Preparing ${status.queued} ${status.queued === 1 ? "photo" : "photos"} for search…</div>`
-          : status.descriptions?.queued
-            ? `<div class="notice">Writing descriptions for ${status.descriptions.queued} photos. You can keep browsing while they are prepared.</div>`
-            : status.descriptions?.failed
-              ? `<div class="notice">${status.descriptions.failed} descriptions need attention. Open a photo to retry or write one.</div>`
-              : "";
+      } else notice.innerHTML = "";
     }
     if (
       modelReady &&
@@ -312,8 +400,34 @@ async function detail(id) {
   try {
     const p = await api(`/api/photos/${id}`);
     const d = modal(
-      `<h2>${esc(p.filename)}</h2>${p.status === "ready" ? `<div class="photo-view"><img src="/assets/photos/${p.id}" alt="${esc(p.filename)}"></div><div class="detail-tags"><p class="sub">${p.description?.manual ? "Your description" : "Automatic description · review and correct if needed"}</p><form id="description-form"><label for="scene-caption">Description</label><textarea id="scene-caption" rows="3" maxlength="2401" required placeholder="A small white dog lies on green grass beside white flowers.">${esc(p.description?.caption || "")}</textarea><div class="actions"><button class="primary" type="submit">Save description</button>${p.description?.status === "error" && !p.description?.manual ? '<button type="button" id="retry-description">Retry automatic description</button>' : ""}</div><p class="sub" role="status">${esc(p.description?.error || (!p.description?.caption ? "An automatic description is being prepared. You can write one now." : ""))}</p></form></div>` : `<p class="notice ${p.status === "error" ? "error" : ""}">${esc(p.error || "This photo is being prepared for search.")}</p>`}<div class="dialog-footer"><button class="danger" id="delete-photo">Delete photo</button><div class="actions">${p.status === "error" ? '<button id="retry-photo">Try again</button>' : ""}<a class="button" download="${esc(p.filename)}" href="/assets/originals/${p.id}">Download original</a></div></div>`,
+      `<h2>${esc(p.filename)}</h2>${p.status === "ready" ? `<div class="photo-view"></div><div id="preview-error" class="preview-error" hidden><p>Preview failed to load. Retry it or download the original below.</p><button type="button" id="retry-preview">Retry preview</button></div><div class="detail-tags"><p class="sub">${p.description?.manual ? "Your description" : "Automatic description · review and correct if needed"}</p><form id="description-form"><label for="scene-caption">Description</label><textarea id="scene-caption" rows="3" maxlength="2401" required placeholder="A small white dog lies on green grass beside white flowers.">${esc(p.description?.caption || "")}</textarea><div class="actions"><button class="primary" type="submit">Save description</button>${p.description?.status === "error" && !p.description?.manual ? '<button type="button" id="retry-description">Retry automatic description</button>' : ""}</div><p class="sub" role="status">${esc((p.description?.error ? descriptionProblem(p.description.error) : "") || (!p.description?.caption ? "An automatic description is being prepared. You can write one now." : ""))}</p></form></div>` : `<p class="notice ${p.status === "error" ? "error" : ""}">${esc(p.error || "This photo is being prepared for search.")}</p>`}<div class="dialog-footer"><button class="danger" id="delete-photo">Delete photo</button><div class="actions">${p.status === "error" ? '<button id="retry-photo">Try again</button>' : ""}<a class="button" download="${esc(p.filename)}" href="/assets/originals/${p.id}">Download original</a></div></div>`,
     );
+    if (p.status === "ready") {
+      const img = previewImage(
+        p,
+        (failed) => {
+          $("#preview-error", d).hidden = !failed;
+          const card = $("#grid")?.querySelector(`[data-id="${id}"]`);
+          if (!failed) {
+            const cardImage = card?.querySelector("img");
+            if (cardImage?.hidden)
+              cardImage.src = `/assets/photos/${id}?retry=${Date.now()}`;
+          }
+          if (card)
+            paintCardIssues(
+              card,
+              photos.find((photo) => String(photo.id) === String(id)) || p,
+            );
+        },
+        false,
+      );
+      $(".photo-view", d).append(img);
+      $("#retry-preview", d).onclick = () => {
+        img.src = `/assets/photos/${id}?retry=${Date.now()}`;
+        const cardImage = $("#grid")?.querySelector(`[data-id="${id}"] img`);
+        if (cardImage) cardImage.src = img.src;
+      };
+    }
     $("#description-form", d)?.addEventListener("submit", async (e) => {
       e.preventDefault();
       try {

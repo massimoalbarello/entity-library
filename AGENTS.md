@@ -32,3 +32,7 @@ Keep the search interface minimal: no suggested-query chips or â€œTry a searchâ€
 
 Leave at least 16px between editable fields and their action row; use consistent gaps between
 controls and hide empty status text so form spacing does not depend on incidental margins.
+
+Keep photo preview DOM nodes stable across metadata polling. Show preview, processing and
+description problems on the affected photo card with a visible marker and specific explanation;
+do not replace these with collection-wide warning counts. Provide recovery in the photo dialog.

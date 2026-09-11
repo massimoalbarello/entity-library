@@ -378,6 +378,103 @@ try {
     fullPage: true,
   });
   await page.getByRole("button", { name: "Close", exact: true }).click();
+  // Slow uncached previews must survive repeated metadata polls.
+  let previewRequests = 0;
+  let failPreview = false;
+  const previewRoute = `**/assets/photos/${phone.id}*`;
+  await page.route(previewRoute, async (route) => {
+    previewRequests++;
+    if (failPreview)
+      return route.fulfill({
+        status: 503,
+        body: "Preview temporarily unavailable",
+      });
+    const response = await route.fetch();
+    await Bun.sleep(3500);
+    await route.fulfill({ response });
+  });
+  await page.reload();
+  const card = page.locator(`.photo-card[data-id="${phone.id}"]`);
+  await card.locator("img").waitFor();
+  const imageNode = await card.locator("img").elementHandle();
+  await page.waitForFunction((id) => {
+    const img = document.querySelector(
+      `.photo-card[data-id="${id}"] img`,
+    ) as HTMLImageElement;
+    return img?.complete && img.naturalWidth > 0;
+  }, phone.id);
+  await page.waitForTimeout(3000);
+  assert.equal(await imageNode!.evaluate((img) => img.isConnected), true);
+  assert.equal(
+    previewRequests,
+    1,
+    "Metadata polling must not restart slow preview downloads",
+  );
+  // A saved caption must not hide a new generation failure on that photo.
+  await page.route("**/api/photos", async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    for (const p of payload.photos)
+      if (p.id === phone.id) {
+        p.description.status = "error";
+        p.description.error = "No useful description generated";
+      }
+    await route.fulfill({ response, json: payload });
+  });
+  await card.locator(".issue-badge").waitFor();
+  assert.match(
+    await card.locator(".card-issues").innerText(),
+    /description was too short/,
+  );
+  assert.equal(
+    await imageNode!.evaluate((img) => img.isConnected),
+    true,
+    "Caption updates preserve loaded image",
+  );
+  assert.equal(await page.locator("#model-notice").innerText(), "");
+  await page.unroute("**/api/photos");
+  await page.waitForFunction(
+    (id) =>
+      document
+        .querySelector(`.photo-card[data-id="${id}"] .issue-badge`)
+        ?.hasAttribute("hidden"),
+    phone.id,
+  );
+  // A browser preview failure stays visible through polls and can be retried in place.
+  failPreview = true;
+  await page.reload();
+  await card.locator(".issue-badge").waitFor();
+  assert.match(
+    await card.locator(".card-issues").innerText(),
+    /Preview failed to load/,
+  );
+  await page.waitForTimeout(3000);
+  assert.equal(await card.locator(".issue-badge").isVisible(), true);
+  await card.click();
+  await page.locator("#retry-preview").waitFor();
+  await page.screenshot({
+    path: join(out, "preview-error.png"),
+    fullPage: true,
+  });
+  failPreview = false;
+  await page
+    .getByRole("button", { name: "Retry preview", exact: true })
+    .click();
+  await page.waitForFunction(() =>
+    document.querySelector("#preview-error")?.hasAttribute("hidden"),
+  );
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await page.waitForFunction((id) => {
+    const img = document.querySelector(
+      `.photo-card[data-id="${id}"] img`,
+    ) as HTMLImageElement;
+    return img && !img.hidden && img.complete && img.naturalWidth > 0;
+  }, phone.id);
+  assert.equal(await card.locator(".issue-badge").isVisible(), false);
+  await page.unroute(previewRoute);
+  console.log(
+    "PASS persistent slow previews, card-specific errors and preview retry recovery",
+  );
   await api(`/api/photos/${phone.id}`, "DELETE");
   await add("banana.jpg");
   await add("cats.png");
@@ -532,6 +629,11 @@ try {
   const invalidId = (await invalid.json()).id;
   await ready();
   assert.equal((await api(`/api/photos/${invalidId}`)).body.status, "error");
+  await page.getByRole("button", { name: "Clear search", exact: true }).click();
+  const brokenCard = page.locator(`.photo-card[data-id="${invalidId}"]`);
+  await brokenCard.locator(".issue-badge").waitFor();
+  assert.match(await brokenCard.locator(".card-issues").innerText(), /Photo:/);
+  assert.equal(await page.locator("#model-notice").innerText(), "");
   assert.equal((await api(`/api/photos/${invalidId}`, "DELETE")).status, 200);
   // Exercise the largest supported PNG decode and UTF-8 filename truncation.
   const large = join(fixtures, "large.png");
