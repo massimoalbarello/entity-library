@@ -480,9 +480,6 @@ dialog .close {
 .detail-tags {
   margin: 16px 0;
 }
-.detail-tags button {
-  margin: 0 5px 7px 0;
-}
 .dialog-footer {
   display: flex;
   justify-content: space-between;
@@ -720,6 +717,16 @@ dialog .close {
   font: inherit;
   color: inherit;
   background: #fff;
+}
+#description-form .actions {
+  margin-top: 16px;
+  gap: 12px;
+}
+#description-form [role="status"] {
+  margin: 12px 0 0;
+}
+#description-form [role="status"]:empty {
+  display: none;
 }
 .photo-tags {
   white-space: normal;

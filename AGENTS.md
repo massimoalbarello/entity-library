@@ -29,3 +29,6 @@ Search always combines description BM25 and thresholded visual retrieval into on
 Do not add a search mode selector or silently fall back to only one retrieval source.
 
 Keep the search interface minimal: no suggested-query chips or “Try a search” row.
+
+Leave at least 16px between editable fields and their action row; use consistent gaps between
+controls and hide empty status text so form spacing does not depend on incidental margins.
