@@ -17,3 +17,6 @@ when changing bundled dependencies.
 
 Use real browser or inference checks when a change crosses those boundaries. Add tests for
 observable behavior and data integrity rather than duplicating implementation details.
+
+Keep the interface black, white and neutral gray, matching Face Library's Minimal Neutral
+palette. Preserve the original colors of photos and camera previews.
