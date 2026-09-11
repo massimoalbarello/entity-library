@@ -119,3 +119,25 @@ existing originals and valid CLIP vectors are retained.
 Captions remain approximate. The host run invented an extra red phone/brand detail for the
 same picture. The first version therefore exposes an editable caption and does not claim
 reliable automatic physical-versus-depicted entity extraction. See `SCENE-DESCRIPTIONS.md`.
+
+
+## Single-description update — 11 September 2026
+
+Checked build: [34617808811](https://github.com/massimoalbarello/entity-library/actions/runs/34617808811),
+source `e0a48301aa5129f18e7771a1bc1c4378fd2dbc63`.
+
+- Native migration checks preserve originals, vectors and both former manual text fields,
+  remove the second field, rebuild BM25, and regenerate legacy automatic captions once.
+  The migration also passed against a copy of the live 20-photo / 100-embedding library.
+- Tests cover direct-opening cleanup, retaining meaningful screen relationships inside a
+  sentence, adjective queries, manual edit precedence and restart/deletion behavior.
+- Real local and Linux browser/inference suites passed, including the single description
+  editor, phone/person regression, adjective search, camera, persistence and authentication.
+  Desktop and mobile editor previews remain monochrome and contain one text area.
+- The Linux job enforced 1 CPU / 1 GiB. Its 327.1 MiB cgroup counter has the shared-cache
+  caveat described above and is not a total-RAM claim.
+- The revised prompt requests visible attributes and relationships with a 96-token budget.
+  The Linux phone caption was “A black phone with a red case on top of a white laptop.”
+  This still misattributes some colors/objects in the stacked-laptop photo. The local model
+  also inserted an unsupported phone brand despite instructions; prompt changes improve
+  description style, not factual guarantees. Manual corrections remain available.

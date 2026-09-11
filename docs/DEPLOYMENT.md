@@ -6,22 +6,22 @@ App slug: `entity-library-gf84pk`. Redeploy this same app to preserve its hostna
 photos and downloaded models. The local `.nibrun.json` records that target and is ignored by Git.
 
 The deployed executable is the tested Linux build, SHA-256
-`70d9eec0558582291a757d4fe596591554fb850f84df45f63664d4ab2d9c1303`.
-Deployment ID: `01a0911c-ba45-740e-b916-bcda4b9ad138`.
+`a90b556867f23f72c2018cb1b2e9cfc165471418dd2212b292a08568772c6c4a`.
+Deployment ID: `01a09129-c6d5-7565-b12a-15376b83e3cd`.
 
-The executable was downloaded from the successful [checked build](https://github.com/massimoalbarello/entity-library/actions/runs/34616629926)
-for source commit `878dfaee7990026c354f24adbc11990996feb5c1`, verified against the workflow's
-SHA256SUMS, and then uploaded to the existing app. The live stylesheet matches the checked
-source byte for byte and uses Face Library’s black, white and neutral-gray palette; photos
-retain their original colors. Desktop, mobile, sign-in and caption-editor previews were checked.
-Both pinned caption-model artifacts were installed during the preceding caption deployment.
+The executable was downloaded from the successful [checked build](https://github.com/massimoalbarello/entity-library/actions/runs/34617808811)
+for source commit `e0a48301aa5129f18e7771a1bc1c4378fd2dbc63`, verified against the workflow's
+SHA256SUMS, and then uploaded to the existing app. The served JavaScript matches the checked
+source byte for byte, with one description field and two search choices: Descriptions and
+Visual similarity. Face Library’s black, white and neutral-gray palette is retained.
 
-HTTPS `/health` returned 200 and unauthenticated `/api/photos` returned 401. The served UI
-contains the scene-description search modes and caption editor. Before/after snapshots from
-the preceding caption deployment confirmed all **19 original photo files**, all photo/view records, and all **95
-embedding records** were unchanged. At the verification snapshot, four descriptions were ready,
-one was processing, fourteen were queued, and none had failed. Backfill continues in the app.
-Live examples included a cat on a leather couch, a dog holding a frisbee, and two people riding horses.
+HTTPS `/health` returned 200 and unauthenticated `/api/photos` returned 401. Before/after
+snapshots confirmed all **20 original photo files**, all photo/view records, and all **100
+embedding records** were unchanged. The second description column was removed. At the
+verification snapshot, one refreshed description was ready, one was processing, eighteen
+were queued, and none had failed. Automatic descriptions continue to regenerate in the app.
+The first live result describes a tabby cat with a green collar lying on a leather recliner
+with a remote control beside it. Cached model weights were reused.
 
 Nibrun reports **1 GiB RAM** and one vCPU. The complete local Linux browser suite peaked at
 **953.6 MiB**, including charged file cache and local x86 emulation overhead. The cloud workflow
